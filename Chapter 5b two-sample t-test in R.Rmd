@@ -1,0 +1,367 @@
+---
+title: "Chapter 5b Two-Sample t-Test in R"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 5 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "LastName_ch5b.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Evaluate assumptions of normality and equal variances with histograms prior to doing a *t*-test in R.
+
+* Analyze two-sample data with a *t*-test in R.
+
+* Visualize two-sample data with crossbar and univariate scatter plots in R.
+
+* Correctly interpret the results.
+
+### Introduction
+In this section we will continue to investigate linear models, specifically one-way analysis of variance (ANOVA). That said, we’re actually going to start with a short digression and consider a different analysis, the two-sample *t*-test (pages 103-108 in the book).
+
+As always, our workflow remains the same:
+
+*Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis. For this exercise, we will need the _**tidyverse**_ and _**Hmisc**_ packages. (You may need to install the _**Hmisc**_ package before you can load it.) NOTE: you must load the _**Hmisc**_ package before the _**tidyverse**_ package; if you don't, the **summarize**() function will be hidden from _**dplyr**_ and will not work correctly (try it the other way and see for yourself - read the information in red below the code chunk for details):
+
+Type:
+library(Hmisc)
+library(tidyverse)
+```{r}
+
+```
+
+### Garden ozone levels
+We'll first be working with data on ozone levels measured in gardens distributed around a city. The gardens were either to the east of the city center, or to the west. The ozone data are in parts per hundred million (pphm); ozone in excess of 8 pphm can damage lettuce plants. We are interested in whether there is a difference in the average ozone concentration between gardens in the east versus the west.
+
+The data are available in a file called "ozone.csv." Import that now, assign it to an object with the same name (i.e., "ozone"), and then visualize it as a tibble:
+
+Type:
+ozone <- read_csv("ozone.csv")
+ozone
+```{r}
+
+```
+
+The resulting data frame has three columns: ozone, a continuous variable coded as a number <dbl>; and garden_location and garden_ID, categorical variables coded as character strings <chr>.
+
+### Two-sample *t*-test
+A two-sample *t*-test compares the means of two groups, assuming that the data in each group are normally distributed and their variances are equal.
+
+The first step in an analysis of data is... making a figure! Given our interest in comparing ozone levels in two groups (east and west gardens), we might start with a set of plots that allow us to see the central tendency and variability in the data. Since there are only two groups, histograms would be a good choice.
+
+Recall that in Chapter 4, you were introduced to the both histograms and facets, a tool to break data into multiple groups during the plotting process. Let's take advantage of that capability: if we stack the histograms on top of each other, we will be able to see whether the means seem different and whether the data appear to be normally distributed with similar variances. In so doing, we will accomplish two tasks at once: visualizing our hypothesis and evaluating some of the key assumptions of the analysis. 
+
+Type:
+ggplot(ozone, aes(x = ozone)) +
+  geom_histogram (binwidth = 10) +
+  facet_wrap(~garden_location, ncol = 1) +
+  theme_bw()
+```{r}
+
+```
+
+The resulting figure provides a visual representation of the distributions of the data in each sample. Looking at them, it seems reasonable to conclude that that the assumptions of normality and equal variances are probably met. (Although the west data may look a little iffy in terms of normality, the sample is quite small, so shifting a couple of observations one way or another would easily fix the problem). Although R has statistical functions for formally evaluating normality and equality of variances, a visual inspection of the data is often sufficient. By the way, what do you think "ncol = 1" in the code above does? Right - it sets the number of columns of faceted plots equal to one. Using nrow = 1 instead would have arranged the two plots side-by-side.
+
+Another reason for plotting the data this way is to see whether the null hypothesis - that the mean ozone level in east and west gardens is the same - might be true or not. It seems as though we may be able to reject that idea, as the peaks of the distributions are at different locations on the *x*-axis; however, there is also considerable overlap, so it's hard to say for sure.
+
+Before we jump into a formal statistical analysis of the data, let's use the **group_by**() and **summarize**() functions in _**dplyr**_ to calculate some summary statistics of the ozone levels in each location:
+
+Type:
+ozone_summary <- ozone %>%
+  group_by(garden_location) %>%
+  summarize(mean_ozone = mean(ozone),
+            sd_ozone = sd(ozone),
+            n_ozone = n(),
+            se_ozone = sd(ozone)/sqrt(n()))
+ozone_summary
+```{r}
+
+```
+
+Well, the means are clearly not the same. The key question, of course, is how likely it is that we would see a difference in ozone concentrations of approximately 16 pphm in our samples due only to chance, if there is actually no real difference between gardens on either side of the city (i.e., if the null hypothesis that the true difference in means is equal to zero is correct). Let's do the test and find out!
+
+Type:
+t.test(ozone ~ garden_location, data = ozone)
+```{r}
+
+```
+
+Let's consider the arguments we gave to the **t.test**() function: we provided a formula and a data argument. The formula argument specifies the data values we want to evaluate (ozone) and the factor with two levels giving the corresponding groups (garden_location). The data argument tells R where to find the data.
+
+The first line of the output tells us the statistical test performed: a Welch two-sample *t*-test. This is what we asked for, apart from the word "Welch" - that's a clear indication that R is doing something at least somewhat unexpected, which we shouldn't ignore. We'll come back to that later, however.
+
+Next, we see that the data R used are declared - this is a good way to confirm that you've analyzed what you wanted to analyze. The next line provides the traditional *t*-test statistic, degrees of freedom, and *p*-value. The line after that declares the alternative hypothesis for us: that the true difference in means is not equal to 0. Next is the 95% confidence interval *around the difference between the two means*. Keep in mind that the difference would be 0 if the means were the same. The fact that the interval does not include 0 provides an answer to our initial question: the probability that the true difference in mean ozone levels between the two garden sets is 0, given the data from the two samples, is rather small. How small? That's what the *p*-value tells us - just over 5 times in 10,000, so pretty small.
+
+Finally, the last line in the output provides the calculated mean ozone level for each group. Given that ozone in excess of 8 pphm can (allegedly) make lettuce plants full of latex and yucky to eat, it's clear that we probably don't want to eat produce from either set of gardens. Which is why if you live in a city, farm stands are awesome...
+
+Now, back to the word "Welch." A quick look at the help files for **t.test**() reveals that this method allows one of the assumptions of the standard two-sample *t*-test to be relaxed - that of equal variances. Although it probably didn't matter in this case, as the variances in the two groups looked pretty similar, you now know that there are options for when this assumption is not met!
+
+If you really want to do a formal test for equality of variance, there are several functions you can use. For example, the **var.test**() function has the same structure as **t.test**():
+
+Type:
+var.test(ozone ~ garden_location, data = ozone)
+```{r}
+
+```
+
+Perhaps not surprisingly, the output of the **var.test**() function also has the same structure as that of **t.test**(). In this case, the calculated test statistic is *F*, rather than *t*. *F* is the ratio of two variances, and so if the null hypothesis that the two variances are equal is true, *F* will equal 1. In this case, F = 0.76 (or alternatively, 1.32, if the ratio were flipped); although clearly not 1, the chance of getting an *F*-value this extreme (or more so) even when the null hypothesis is true is quite high - *p* = 0.6823. Note also that the reported 95% confidence interval includes 1. We therefore have no reason to believe that the two variances are different (which is NOT equivalent to saying that we have evidence that they are the same!).
+
+If you wanted to use the above result as a rationale for using the standard two-sample *t*-test that assumes equal variances, you could do that by adding the argument "var.equal = TRUE" to your **t.test**() function call.
+
+Type:
+t.test(ozone ~ garden_location, data = ozone, var.equal = TRUE)
+```{r}
+
+```
+
+The output is almost identical to that of the Welch version above. The only differences are the df and *p*-values. The standard two-sample *t*-test reports df = 18, which is what we would expect with two samples of *n* = 10 observations each (look up the formula for *t* if you don't remember why this is so). In contrast, the Welch two-sample *t*-test reports df = 17.656 - the more unequal the variance, the more the degrees of freedom associated with the test are reduced. More degrees of freedom means that a given statistical test has greater power to detect a departure from the null expectation, if one exists. Note that the *p*-value associated with the standard test is slightly smaller than the one associated with the Welch test, meaning that the evidence against the null hypothesis is even stronger than before. Although in this case we would come to the same conclusion, regardless of which version of the *t*-test we used, that may not always be true.
+
+At this point in our workflow, we should be thinking about how to visualize our data in a fashion more appropriate for communicating our results than the crude histograms we made above. One possible way to do this is by plotting summarized *y*-values at each unique *x*; the **stat_summary**() function does just that. The arguments for this function are: 
+
+stat_summary(mapping = NULL, data = NULL, geom = "pointrange", position = "identity", ...)
+
+The aesthetic mapping and data arguments are NULL by default, as these will have usually already been set in **ggplot**. The geom argument sets the geometric object used display the data - there are lots of different geoms you can use; the position argument specifies any adjustment to use for overlapping points on this layer ("identity" tells R to plot the actual values); and ... lists other arguments passed on to the function - for example: **fun.min**, **fun**, and **fun.max** are summary functions that take a numeric vector (list of numbers) and return single numbers to be used as the minimum, actual, and maximum values for *y* at a given *x*. **fun.data** is a complete summary function that takes a data frame as input and returns a data frame as output.
+
+Let's have a look. Pointranges indicate variation by strokes (lines) with a dot in the middle. In this case, let's plot the mean ozone value in each group as a point and the range from minimum to maximum ozone values as a line.
+
+Type:
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  stat_summary(fun.min = "min", fun = "mean", fun.max = "max")
+```{r}
+
+```
+
+Compare the plotted values to those in the original data set or that you calculated using the **group_by**() and **summarize**() functions above - they are the same. Note that we didn't need to specify geom_pointrange in the code above, as that is the default geom for the **stat_summary**() function. This highlights an important thing to know about **ggplot**(): every geom has a default stat and every stat has a default geom. The implication of this statement is that we could produce the same plot by using the **geom_pointrange**() function instead of the **stat_summary**() function - and in fact we can:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_pointrange(stat = "summary", fun.min = "min", fun = "mean", fun.max = "max")
+```{r}
+
+```
+
+Whoa! Compare the two code chunks above and make sure you see how they differ from one another, and how they are related. Of course, you can override the default arguments of any function if you like... So, if instead of visualizing the stat_summary data with a pointrange we wanted to use a classic errorbar to display the maximum and minimum values, we could do that by specifying geom_errorbar:
+
+Type:
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_errorbar(stat = "summary", fun.min = "min", fun = "mean", fun.max = "max")
+```{r}
+
+```
+
+We did not actually need to specify the argument fun = "mean", because errorbars in _**ggplot2**_ do not include points at the center. In addition, the horizontal lines on the errorbars (caps) seem pretty wide; we can specify the width by including an additional argument, "width = ":
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_errorbar(stat = "summary", fun.min = "min", fun.max = "max", width = 0.1)
+```{r}
+
+```
+
+Better! Let's try another one. geom_crossbar is a hollow bar with middle indicated by horizontal line:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.min = "min", fun = "mean", fun.max = "max")
+```{r}
+
+```
+
+Okay, there are clearly lots of options available to us. There is one other function mentioned previously that we haven't tried yet - **fun.data**(). This is actually super useful, as it takes data and uses functions from the package _**Hmisc**_ to calculate means, standard deviations, standard errors, confidence intervals, etc.
+
+To display means and standard errors, type:
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_se")
+```{r}
+
+```
+
+That was easy! You can see that R has calculated the means and standard errors (se) of ozone levels in gardens on the east and west sides of town, and then plotted each as a hollow bar with the mean indicated by a horizontal line in the middle and the top and bottom set by the mean +/- se. 
+
+What if we wanted to visualize the mean +/- 95% confidence interval instead?
+
+Type:
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal")
+```{r}
+
+```
+
+This visualization is essentially what the *t*-test evaluated - the fact that the 95% confidence intervals do not overlap suggests that the two means are unlikely to differ so much by chance. (That said, determining whether confidence intervals overlap is an overly conservative approach for identifying significant differences between groups. It’s true that when confidence intervals don’t overlap, the difference between groups is statistically significant; however, when there is some overlap, the difference might still be significant.)
+
+For future reference, the **mean_cl_normal**() function has an argument to change the width of the confidence interval. If we wanted to display 99% instead of 95% confidence intervals, we could do that with this code:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", fun.args = list(conf.int = 0.99))
+
+That said, we'll leave it at 95% for now as that is the value most often reported. Let's see what else we can do to make this figure look a little nicer. We can specify the width, line color, and fill color of the boxes; change the *x*- and *y*-axis labels; and remove the gray background and plot legend.
+
+Type:
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.2, color = "black", fill = "gray") +
+  xlab("Garden location") +
+  ylab("Ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+Not bad!
+
+### Rethinking how to present continuous data in small sample sizes
+As outlined in the Weissgerber et al. 2016 paper available in the *Files* tab on the lower right pane of RStudio, although commonly used, graphs that show just the mean and standard error (SE) or standard deviation (SD) can be problematic. Many different data distributions can lead to the same summary graph; the full data may suggest different conclusions from the summary statistics. Also, summarizing the data as mean and SE or SD often causes readers to wrongly infer that the data are normally distributed with no outliers (note the difference between the asymmetrical histograms or pointrange plots versus the symmetrical crossbar plot). In contrast, univariate scatterplots, box plots, and histograms allow readers to examine the actual distribution of the data.
+
+The problem is that those types of visualization often don't match up well with the associated statistical analyses used to evaluate hypotheses about the data. For example, a boxplot showing the distribution of fruit production in the Grazed and Ungrazed treatment groups (see Chapter 4) suggested that trees in the Grazed treatment produced more fruit. Although this hypothesis would often be evaluated with a *t*-test, that analysis compares *mean* fruit production in the two groups, whereas the boxplot shows the *median* fruit production. Although a non-parametric test that compared medians might be used instead (e.g., a Mann-Whitney U-test), such tests tend to have less power to detect real differences, if they exist. So, graphs summarizing the data as mean and SE may still have their place.
+
+Perhaps the best approach would be to generate a typical graph with means and error bars, but to also include the individual data values. To do this with **ggplot**(), we'll need to specify two geom layers, one that makes the crossbar and another that plots the individual data values as points:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.2, color = "black", fill = "gray") +
+  geom_point() +
+  xlab("Garden location") +
+  ylab("Ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+Okay. Let's use the size and alpha arguments to make the points a bit bigger and semi-transparent so we can see how much overlap there might be (e.g., in the east garden data):
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.1, color = "black", fill = "gray") +
+  geom_point(size = 3, alpha = 0.5) +
+  xlab("Garden location") +
+  ylab("Mean ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+For the small number of points we have here, this is probably fine. However, for a larger data set overplotting might still make it difficult to see the full range of variation in data values. We can fix that by "jittering" the points - adding a small amount of random variation to each value so that the points are slightly offset from one another. We do this by adding a position = position_jitter() argument to the **geom_point**() function:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.1, color = "black", fill = "gray") +
+  geom_point(size = 3, alpha = 0.5, position = position_jitter()) +
+  xlab("Garden location") +
+  ylab("Mean ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+Whoops! The width of the jittered points doesn't match that of the crossbars - luckily, we can specify the width of the jitter:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.2, color = "black", fill = "gray") +
+  geom_point(size = 3, alpha = 0.5, position = position_jitter(width = 0.1)) +
+  xlab("Garden location") +
+  ylab("Mean ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+That's better. Note the each time you run the code chunk above, you get a slightly different plot as the position of the points has a random component. The only other change we might consider would be to flip the order of East and West, so that they matched the compass coordinates, with West on the left side of the graph. To do so, we would need to add a line of code to the import function and then remake the figures:
+
+ozone <- read_csv("ozone.csv") %>%
+mutate(garden_location = fct_relevel(garden_location, "West", "East"))
+ozone
+
+We'll let it slide for now, but you should always be thinking about what you could do to increase the effectiveness with which you communicate the results of your work.
+
+As with most things in R, there is more than one way to accomplish the same task. For example, **geom_jitter**() specifies a layer of jittered points, so we could use that in place of the **geom_point**() layer to get the same plot:
+
+ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.2, color = "black", fill = "gray") +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.5) +
+  xlab("Garden location") +
+  ylab("Ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+```{r}
+
+```
+
+Finally, remember that in R, nothing is real unless you assign it to a named object. In this case, if we want to save the nice plot we just made, we should call it something like "ozone_fig" and then use the **ggsave**() function to export and save it:
+
+ozone_fig <- ggplot(ozone, aes(x = garden_location, y = ozone, color = garden_location)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.2, color = "black", fill = "gray") +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.5) +
+  xlab("Garden location") +
+  ylab("Ozone level") +
+  theme_bw() +
+  theme(legend.position = "none")
+ozone_fig
+ggsave("ozone_fig.png", ozone_fig, width = 4, height = 3)
+```{r}
+
+```
+
+### Fruit production in Grazed versus Ungrazed plots
+Earlier it was mentioned that a boxplot showing the distribution of fruit production in the Grazed and Ungrazed treatment groups from the compensation data we've worked with several times now suggested that trees in the Grazed treatment produced more fruit. 
+From Chapter 4, type:
+ggplot(compensation, aes(x = Grazing, y = Fruit)) +
+  geom_boxplot() +
+  xlab("Grazing Treatment") +
+  ylab("Fruit Production") +
+  theme_bw()
+```{r}
+
+```
+
+Let's evaluate that hypothesis formally.
+
+As always, your workflow should be: *Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*.
+
+1. Load the specific add-on packages you will need for these analyses into R; in this case, _**Hmisc**_ and _**tidyverse**_:
+```{r}
+
+```
+
+2. Import the "compensation.csv" data file into R, give it a short descriptive name (e.g., "compensation"), and view it as a tibble:
+```{r}
+
+```
+
+Visualize the distributions of the Fruit data by Grazing treatment as two histograms stacked one on top of the other:
+```{r}
+
+```
+
+Now let's use the **group_by**() and **summarize**() functions in _**dplyr**_ to calculate the mean, standard deviation, sample size, and standard error of Fruit by Grazing treatment:
+```{r}
+
+```
+
+The sample means are not the same; however, it is possible that the observed difference just represents chance variation associated with small samples and that in truth the larger populations from which the samples are drawn do not differ.
+
+Evaluate the likelihood that mean fruit production differs between Grazed and Ungrazed plots with a *t*-test.
+```{r}
+
+```
+
+Remember that the *p*-value associated with a *t*-test is only valid if the assumptions of normality and equal variances are met. Given that the sample sizes are small it's a bit hard to tell, but based on the histograms above these data are probably okay. 
+
+Produce a figure using the one below as a guide.
+
+<center>
+![Fig. 2. Example figure.](example_fruit_fig.png)
+</center>
+```{r}
+
+```
+
+Well done! Use the results of your analyses above to answer the questions in the associated Quiz in BeachBoard.
+
+### Wrapping up
+Save your file and exit the R session.

@@ -1,0 +1,391 @@
+---
+title: "Chapter 4 Visualizing Your Data in R"
+author: "Jhen Cabasal"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 4 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "LastName_ch4.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+1. Identify the key arguments in the *ggplot*() function and how they relate to the layered grammar of graphics;
+
+2, Create a scatterplot, boxplot, and histogram with the _**ggplot2**_ package;
+
+3. Customize plots by altering backgrounds, colors, axis labels, etc.;
+
+4. Export and save plots using the *ggsave*() function in the _**ggplot2**_package.
+
+### Introduction
+If you don't already, you should start to follow a fundamental rule of data science: *never* start with a statistical analysis, *always* start with a visualization.
+
+If you have collected your data within some sort of experimental or theoretical framework, you should have at least some ideas about what those data should look like, based on the underlying models that produced them. **Plot your data first.** Make the picture that should tell you the answer to your question - make the axes correspond to the theory. If you can do this, and see the pattern you expected, you are in great shape. You will possibly have gained some insight into your system! (The follow up step is to evaluate the likelihood that any of the patterns you see in your data are due to chance; that's the role of statistical analysis, but we'll postpone any further discussion of that until Chapter 5).
+
+There are three major figure types introduced in this chapter. The first is the scatterplot, the second is the box-and-whisker plot, and the third is the histogram. Along the way, you will learn how to do some pretty special things with colors and lines and _**dplyr**_ too. This will get even more advanced in the chapters on data analysis, and we will come back to figure enhancing in Chapter 8.
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis. For this exercise, we will need the _**tidyverse**_ package:
+
+Type and run: library(tidyverse)
+```{r}
+library(tidyverse)
+```
+
+We’ll be working with the compensation data we used in the last chapter, so go ahead and import that now and then visualize it as a tibble. Type and run:
+
+compensation <- read_csv("compensation.csv")
+compensation
+```{r}
+compensation <- read_csv("compensation.csv")
+compensation
+```
+
+Just as a reminder, the compensation data are about the production of fruit (apples, kg) on rootstocks of different widths (mm; the tops of trees are grafted onto rootstocks). Furthermore, some trees are in parts of the orchard that allow grazing by cattle, and others are in parts free from grazing.
+
+### *ggplot2*: a grammar for graphics
+Our plotting from now on will be done with the _**ggplot2**_ package. Not only is _**ggplot2**_ popular, and thus there are immense online resources and help, but as part of the tidyverse it works very well with _**dplyr**_. It is, in a word, awesome. Let's start with the basic syntax. We will use the **ggplot**() function (in the _**ggplot2**_ package, already loaded with _**tidyverse**_). Here's how to make a simple, plain, bivariate scatterplot of the compensation data - type and run:
+
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point()
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point()
+```
+
+Look at that - you made a graph! Time for a break...JK.
+
+Like the functions in the _**dplyr**_ package, the first argument to give **ggplot**() is the name of the data frame (in this case, compensation) in which your data can be found. The next argument, **aes**(), is interesting. First, it is itself a function. Second, it defines the graph's *aesthetics*; that is, the mapping between variables in the dataset and features of the graph. It is here that we tell R, in this example, to associate the *x*-position of the data with the values in the Root variable, and the *y*-position of the data with the values in the Fruit variable. We are setting up and establishing which variables define the axes of the graph. (The Cartesian (*xy*) coordinate system is the default; however, as we'll see later, you can also specify alternative systems, e.g., polar coordinates).
+
+The other significant thing about _**ggplot2**_ that you need to wrap your head around is that it works by adding layers and components to the aesthetic map. The data and aesthetics *always* form the first layer. Then we add the geometric objects, like points, lines, bars, and other things that report the data. We can also add/adjust other components, like *x*- and *y*-label customization. The trick is to know that the + symbol is how we add these layers and components.
+
+Separating out each layer into a different line of code makes it *much* easier to see all of the different components in a given figure, and therefore, to alter one (or more) if you aren't happy at first with how the plot looks. So, in the above example, you should follow the *aes*() function call with a + and then hit Return/Enter. The next line should be automatically indented, signifying that it is still considered part of the original line of code, even though it is now on a different line. On this second line, you should add the geometric layer - in this case with the function *geom_point*().
+
+This is thus a two-layer graph. The first layer declares the data and aesthetics, and the second specifies that the data will be visualized with points. You may or may not like the default output. We'll come back to that.
+
+First, let's go a bit further with this example...
+
+### Interpretation, then customization
+Before we get into how to do a few basic customizations of this figure, let's have a look at it, biologically. We are interested here in the patterns. Have we recovered what we might expect? Of course. On the *x*-axis are the rootstock width (Root) values and on the *y*-axis the fruit production (Fruit) values. The relationship is clearly positive. *And* there appear to be two groups of points, presumably corresponding to the two groups in the Grazing treatment, Grazed and Ungrazed. Gooood.
+
+### Modifying your scatterplot
+Now we are ready to do a few things to make this figure more representative of the data. Specifically, we will figure out how to:
+
+1. quickly get rid of the gray background;
+
+2. alter the size of points and text;
+
+3. add colors that correspond to the groups for the Grazing factor.
+
+As has been noted previously, refer to Chapter 8, the *R Graphics Cookbook*, and *R for Data Science* for even more customization options.
+
+The gray background is a divisive feature of _**ggplot2**_; people seem to either love it or hate it (and to be honest, there may be more hate than love here). But, it's very easy to get rid of it. Built into _**ggplot2**_ are themes. One of those is **theme_bw**(). It's good practice to place such themes as the very last component of your *ggplot*() function call.
+
+Try that now: copy the code from the previous chunk into the one below, add a + after *geom_point*(), hit Return/Enter, type theme_bw(), and hit Run:
+
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point() +
+  theme_bw()
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point() +
+  theme_bw()
+```
+
+There, that was easy. Next, let's say we want to increase the size of the points on the graph. As *geom_point*() is a function, it has a series of arguments associated with it. (By not specifying any above, we told *ggplot*() to just use the default values; you can investigate what those are by searching "geom_point" in the RStudio help window).
+
+Try specifying size = 5 in the *geom_point*() function call - change that line of code to read geom_point(size = 5) +:
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point(size = 5) +
+  theme_bw()
+```
+
+Whoa; those are some big points!
+
+Now let's alter the *x*- and *y*-axis labels. We can do that with the *xlab*() and *ylab*() functions. Insert two new lines of code between the lines with *geom_point*() and *theme_bw*(): xlab("Root Biomass") and ylab("Fruit Production"). Don't forget to include the + after each line!
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit)) +
+  geom_point(size = 5) +
+  xlab("Root Biomass") +
+  ylab("Fruit Production") +
+  theme_bw()
+```
+
+The final customization we'll do right now is to adjust the colors of the points to match specific levels in a grouping factor. This is super useful for relating figures to statistical models, as we'll see in the next chapter. Also, it's super easy to do with _**ggplot2**_.
+
+All you need to do is add the following code to the *aes*() function call after the arguments specifying x and y: color = Grazing. Yep - that's it. Once that part of your code reads aes(x = Root, y = Fruit, color = Grazing), hit Run:
+
+ggplot(compensation, aes(x = Root, y = Fruit, color = Grazing)) +
+  geom_point(size = 5) +
+  xlab("Root Biomass") +
+  ylab("Fruit Production") +
+  theme_bw()
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit, color = Grazing)) +
+  geom_point(size = 5) +
+  xlab("Root Biomass") +
+  ylab("Fruit Production") +
+  theme_bw()
+```
+
+With this bit of magic, *ggplot*() is mapping the levels of Grazing (there are two: Grazed and Ungrazed) to two default colors. You may not like the colors, but as you have probably guessed - you can change them (see Chapter 8). And look - we get a bonus graphical legend as well (which can also be modified). Lastly, you can also/or change the shape of the points. Just declaring that shape = Grazing will return the first two default values (in this case, triangles and circles).
+
+You try it - just replace "color" with "shape" and see what happens:
+```{r}
+ggplot(compensation, aes(x = Root, y = Fruit, shape = Grazing)) +
+  geom_point(size = 5) +
+  xlab("Root Biomass") +
+  ylab("Fruit Production") +
+  theme_bw()
+```
+
+Again, the beauty of an R Notebook file like this one is that you now have a compact, customized, editable, shareable, repeatable record of your plotting toolset.
+
+### Box-and-whisker plots
+Scatterplots, as above, are very good at displaying raw data. However, there are many ideas about presenting data via some version of their central tendency (e.g., mean, median, or mode) and some estimate of their variation (e.g., standard deviation, standard error, 95% confidence intervals, etc.). In the biological sciences, bar charts are commonly used for this purpose. In the first edition of the book, the authors showed tools to build bar charts ± error bars. However, they have since decided that they don’t like these - they can hide too much information (see the Weissgerber et al. 2015 PLoS Biol.pdf paper in the associated Project folder for additional discussion of this issue). Instead, they suggest using a well-established alternative, the box-and-whisker plot.
+
+Let's look at the compensation data and focus on how Fruit production (the response variable) differs across the levels of the Grazing treatments (the predictor variable); we'll ignore Root (an additional predictor variable) for now. _**ggplot2**_ has a built-in geom for box-and-whisker plots called - wait for it - *geom_boxplot*(). As with the scatterplot, the first graphic layer declares the data frame and the aesthetics. In this instance, the *x*-axis aesthetic is a categorical variable, with the two levels of Grazing. 
+
+So, use *ggplot*() to create a boxplot where level of grazing is on the *x*-axis and fruit production on the *y*-axis (if you are modifying code copied from above, you'll need to make sure to also change the text for the *x*-axis label):
+
+ggplot(compensation, aes(x = Grazing, y = Fruit)) +
+  geom_boxplot() +
+  xlab("Grazing Treatment") +
+  ylab("Fruit Production") +
+  theme_bw()
+```{r}
+ggplot(compensation, aes(x = Grazing, y = Fruit)) +
+  geom_boxplot() +
+  xlab("Grazing Treatment") +
+  ylab("Fruit Production") + 
+  theme_bw()
+```
+
+Super! We can also add the raw data as its own layer to this, quite easily (and highlighting nicely the utility of the layering approach employed by _**ggplot2**_). Copy the code from the previous chunk into the one below, after geom_boxplot() + hit Return/Enter to insert a new line, type geom_point(size = 4, color = "lightgray", alpha = 0.5) +, and hit Run:
+
+ggplot(compensation, aes(x = Grazing, y = Fruit)) +
+  geom_boxplot() +
+  geom_point(size = 5, color = "lightgray", alpha = 0.5) +
+  xlab("Grazing Treatment") +
+  ylab("Fruit Production") +
+  theme_bw()
+```{r}
+ggplot(compensation, aes(x = Grazing, y = Fruit)) +
+  geom_boxplot() +
+  geom_point(size = 5, color = "lightgray", alpha = 0.5) +
+  xlab("Grazing Treatment") +
+  ylab("Fruit Production") +
+  theme_bw()
+```
+
+The result is a lovely display of the individual values, median, and spread of the fruit production data by grazing treatment. You may have noticed that the *geom_point*() layer can be customized with respect to point size, color, and *transparency* (alpha). Very nice!
+
+You have now produced two spectacular figures. You should be feeling pretty confident. However, don't forget to look at the graphs biologically and think about what they show:
+
+* Do trees with wider root diameters at the start of the experiment produce more fruit?
+
+* Do trees in grazed or ungrazed plots produce more fruit?
+
+* What ecological mechanisms might explain these patterns?
+
+### Distributions: making histograms of numeric variables
+Looking at the distribution of our variables is extremely important. We can get clues about the shape of the distribution, about the central tendency, about spread, and if there might be some rather extreme values. Many statistical tests can be visualized by looking at distributions.
+
+Plotting distributions using *ggplot*() involves *geom_histogram*(). It requires that you think a bit about what a histogram is and what it is not. Specifically, histograms are not bar graphs - rather, they are a graphical display of the frequency with which your data fall into different "bins", e.g., weight classes for different levels of fruit production. Critically, the aesthetics specified in *aes*() have only one variable - the *x*-variable; R will produce the *y*-axis values based on the counts of observations in each bin.
+
+So...let's produce a histogram of fruit production. Type ggplot(compensation, aes(x = Fruit)) +, hit Return/Enter and type geom_histogram(), then hit Run:
+```{r}
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram()
+```
+
+Now, in all honesty that figure doesn't look very nice. Note the warning message above the plot - *ggplot*() is telling you that it divided the fruit production data into 30 equal bins (weight classes), but that you should pick a better value than the default. We have to change the "binwidth". Actually, we can change either the binwidth (how wide each bar is in "fruit units") or the number of bins. Both of the following two approaches produce roughly the same view of the data.
+
+Approach 1: binwidth = 15
+
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(binwidth = 15)
+```{r}
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(binwidth = 15)
+```
+
+Approach 2: bins = 10:
+
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10)
+```{r}
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10)
+```
+
+Those are both nicer histograms than the ugly one you made first...
+
+### Facets: groups of data
+Faceting in _**ggplot2**_ is about producing a matrix of graphs, automatically structured by a factor (categorical variable) in your data. Keep in mind that this trick works for almost all graphics in _**ggplot2**_'s toolbox. But we'll demonstrate it here with the histogram. It requires specifying a special component of the figure called a *facet_wrap*(). In this case, we'll divide the data into the two different levels of the factor Grazing (Grazed and Ungrazed) before making histograms for each.
+
+Copy the code from the previous chunk into the one below, add a + after *geom_histogram*(bins = 10), hit Return/Enter, type facet_wrap(~Grazing), and hit Run:
+
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~Grazing)
+```{r}
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~Grazing)
+```
+
+You should note that in the argument for the *facet_wrap*() function, the ~ symbol precedes the grouping variable (Grazing, in this example). Have a look at the associated help documentation, just to get an idea of what other arguments you might want to specify sometime.
+
+### Saving your graphs
+Now that you've made some nice figures, you'll want to be able to save them somewhere so they are available to be used in other places, like presentations, manuscripts, and reports. You may have noticed is that if you resize the RStudio window on your computer, the size and/or scaling of the figures you made also changes. Unfortunately, the way a figure looks in RStudio is not necessarily how it will look when exported out of the program. The good news is that you can specify exactly what size and shape the final figure will be when you export the file. The bad news is that there is no truly simple way to do this in an interactive format like R Notebook.
+
+The book mentions that there is an Export button in the *Plots* tab on the lower right pane of RStudio. That seems great; but, this only works if there is a plot in the actual window (i.e., you won't be able to export any of the plots you just made in your Notebook file this way). You would instead need to copy all of the code needed to make the figure (including data import, any necessary manipulations, and plotting) into a Script file and run it there first. That will generate a plot in the *Plot* tab. That seems inefficient and also prone to error. Which is okay, since you shouldn't do things in R that require a mouse anyway. Remember - the whole point of writing out your code is that the data analysis process becomes automated and repeatable. Using a mouse-based process establishes no link between the source code and the figure product. This is why, for example, we copied the import code into our script, rather than just using the import button - transparency and repeatability. The same idea applies here.
+
+Instead, you should use the *ggsave*() function in _**ggplot2**_. Copy the code from the previous chunk into the one below and after facet_wrap(~Grazing), type + and hit Return/Enter, type ggsave("fruit_histograms.png"), and hit Run:
+
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~Grazing) +
+  ggsave("fruit_histograms.png")
+```{r}
+ggplot(compensation, aes(x = Fruit)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~Grazing) +
+  ggsave("fruit_histograms.png")
+```
+
+In addition to just remaking the same figure as before, R has exported a copy as a .png file and saved it into the Project folder associated with your R Notebook file. Go find the file (called fruit.histograms.png) and open it just to verify that the process has indeed worked as expected. Outstanding! Of course, you can also change the height and width of the graph, the units, the resolution, and the file type. Check the *ggsave*() help documentation for more information on how to do all that.
+
+### Your turn...
+Now you try. We're going to continue working with the limpet data from last week - growth rates of four species of limpet exposed to low, natural, or high levels of temperature variability in the rocky intertidal zone at Hopkins Marine Station (HMS) in Pacific Grove, CA. 
+
+Import the limpet_growth.csv file, tidy it, and then visualize the resulting data frame as a tibble:
+
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(key = species, value = growth, 4:7)
+limpet_growth
+```{r}
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(key = species, value = growth, 4:7)
+limpet_growth
+```
+
+Okay, that's not super informative; it's always best to start with a graph. Since the data are organized as two categorical predictor (independent) variables - temperature treatment and limpet species identity - and a single continuous response (dependent) variable - growth rate - what sort of plot should we make (of the ones we've learned about so far)?
+
+That's right - a boxplot. (Remember that scatterplots are for visualizing a continuous response against a continuous predictor and histograms are for visualizing frequency distributions of continuous data.) At any rate, let's try that...
+
+Type and run:
+
+Wait a minute - there's a problem. Although it is clear that the arguments for the ggplot aes() function should include data = limpet_growth and y = growth, which x-variable should we use? Let's start with temperature treatment:
+
+ggplot(limpet_growth, aes(x = temp_trt, y = growth)) +
+  geom_boxplot() +
+  theme_bw()
+```{r}
+ggplot(limpet_growth, aes(x = temp_trt, y = growth)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+There are a couple of things to note here:
+
+First, there doesn't appear to be much of an effect of experimental manipulation of temperature variability - the median values (thick horizontal lines) are pretty similar. (In fact, this was the first time this experiment was run, and like many experiments, not everything worked according to plan. We repeated the temperature manipulation with some modifications the following year and saw much more dramatic negative effects of high temperature variability on limpet growth.)
+
+Second, the data appear to be pretty skewed. In each group there are a handful of points that represent much higher growth values than the rest. We might be able to see that better with a histogram of the growth values. Given that we want to see all three temperature treatments at once, we will need to facet the plots by temp_trt. Do that now:
+```{r}
+ggplot(limpet_growth, aes(x = growth)) +
+  geom_histogram() +
+  facet_wrap(~temp_trt) +
+  theme_bw()
+```
+
+Yep; that's a problem. Most statistical analyses assume data have a normal distribution, but with the strong right-skew, that those distributions are pretty clearly log-normal. Luckily, that's easy to fix by taking the log of each growth value and using that instead. Copy and modify the code above to import the limpet_growth.csv file, tidy it, log-transform the growth data (don't forget to remove the negative value for pelta in row 90), and then visualize the resulting data frame as a tibble:
+```{r}
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(species, growth, 4:7) %>%
+  mutate(log_growth = log(growth)) %>% 
+  slice(1:89, 91:120)
+limpet_growth
+```
+
+Now recreate the histograms to see if that solved the problem (remember to change x = growth to x = log_growth):
+```{r}
+ggplot(limpet_growth, aes(x = log_growth)) +
+  geom_histogram() +
+  facet_wrap(~temp_trt) +
+  theme_bw()
+```
+
+Okay; that looks much better! There's still one problem, however; the ordering of the panels doesn't match the underlying structure of the data. If you were sketching out these plots by hand, how would you order the panels with respect to temperature variability treatment? The most logical approach would be from least to most variable, left to right. So: low, natural, high. But that's obviously not what R did. They are actually ordered: high, low, natural. Any ideas about why R did that?
+
+Correct! The different facets are in alphabetical order (the default in R). If we want to change the order of the treatment groups, we can do it; it just takes a couple of steps. We start by converting the temp_trt variable from a character vector <chr> to a factor <fct>, and then tell R how we want to reorder the factor levels. Modifying our code from above:
+
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(key = species, value = growth, 4:7) %>%
+  mutate(log_growth = log(growth)) %>%
+  slice(c(-90)) %>%
+  mutate(temp_trt = as_factor(temp_trt)) %>%
+  mutate(temp_trt = fct_relevel(temp_trt, "low", "natural", "high"))
+limpet_growth
+```{r}
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(key = species, value = growth, 4:7) %>%
+  mutate(log_growth = log(growth)) %>%
+  slice(c(-90)) %>%
+  mutate(temp_trt = as_factor(temp_trt)) %>% #turns temp_trt into a factor
+  mutate(temp_trt = fct_relevel(temp_trt, "low", "natural", "high")) # reorders temp_trt in specifed order
+limpet_growth
+```
+
+The resulting data frame looks almost identical to what we got before, except that the column type listed under temp_trt has changed from <chr> to <fctr>, just like we wanted. The ordering of the data in the column is still the same, however, R should in theory arrange it differently when asked to do something with it. For example, like making plots... Rerun the code chunk to make histograms of the log-transformed growth data:
+
+ggplot(limpet_growth, aes(x = log_growth)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(~temp_trt) +
+  theme_bw()
+```{r}
+ggplot(limpet_growth, aes(x = log_growth)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(~temp_trt) +
+  theme_bw()
+```
+
+Nice! That is a quality job. This is a useful manipulation that will work within a single plot as well - it you want to reorder the levels of a categorical variable, mutate it to a factor variable with as_factor and then reorder with fct_relevel.
+
+Okay, let's revisit the boxplots now. Make a figure box-and-whisker plots showing the summary distributions of the log-transformed limpet growth data in each temperature variation treatment group. Make sure the ordering of the treatments in the figure is logical, add the raw data as an overlay, and label the x- and y-axes as "Temperature variation" and "Limpet growth," respectively. Finally, save the plot as a .png file named "limpet_growth.png."
+
+```{r}
+ggplot(limpet_growth, aes(x = temp_trt, y = log_growth)) +
+  geom_boxplot() +
+  xlab("Temperature Variation") +
+  ylab("Limpet growth") +
+  geom_point(color = "blue", alpha = 0.5) +
+  theme_bw() +
+  ggsave("limpet_growth.png")
+```
+
+That looks pretty great! However, there is one last problem that we should address. Although the log-transformed data clearly have a more normal distribution, most people aren't practiced at thinking in a log scale. In other words, they are unlikely to correctly interpret how different two points might be on a linear scale, as that will change depending upon where on the graph they are located. One elegant way to fix this is to plot the untransformed data on a log-scale. If done correctly, the resulting figure should look exactly the same as the one above (where we plotted the log-transformed data on a linear scale), except that the values will now be plotted in a way that most people will interpret correctly. Genius!
+
+One simple way to do this is to use the scale_y_log10() function. See if you can't figure out how to make that work: (Remember, ?scale_y_log10 or the help window will give you information about the function.)
+```{r}
+ggplot(limpet_growth, aes(x = temp_trt, y = log_growth)) +
+  geom_boxplot() +
+  xlab("Temperature Variation") +
+  ylab("Limpet growth") +
+  scale_y_log10() +
+  geom_point(color = "blue", alpha = 0.5) +
+  theme_bw() +
+  ggsave("limpet_growth.png")
+```
+
+Nice job!
+
+### Wrapping up
+Save your file and exit the R session.

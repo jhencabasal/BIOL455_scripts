@@ -1,0 +1,328 @@
+---
+title: "Chapter 5a Chi-Squared Contingency Table Analysis"
+author: "Jhen Cabasal"
+date: "10/1/2020"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 5 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "Your Last Name_ch5a.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Do some stuff in R that you can't do now... (this section is a work in progress)
+
+### Introduction
+In addition to teaching you how to do some introductory statistics in R, this chapter will also introduce a specific recommended workflow. You should always start an analysis with some expectation of what the data will look like. Make every attempt to understand the hypothesis you are testing, both biologically and statistically. Once you have done that, you can work through the following sequence (presented in more detail in the text):
+
+*Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*
+
+Along the way, you will reinforce several principles from Chapters 1-4, taking advantage of the tools and skills you developed with _**dplyr**_ and _ggplot2**_.
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis. For this exercise, we will need the _**tidyverse**_ and _**vcd**_ packages (you may need to install the _**vcd**_ package first):
+
+library(tidyverse)
+library(vcd)
+```{r}
+library(tidyverse)
+install.packages("vcd")
+library(vcd)
+```
+
+### Ladybug color variation across habitats
+For now, we’ll be working with data on the frequency of black and red ladybugs, *Adalia bipunctata*, in industrial and rural habitats. It has long been thought that such habitats, by virtue of having different levels of pollution, provide different color backgrounds against which insects may sit. Contrasting backgrounds to the insect may lead to a higher risk of predation, providing a potential selective advantage to individuals of a better matched color. Here, we are interested in whether dark morphs are more likely to be found on dark backgrounds (i.e., in industrial habitats).
+
+The data are available in a file called "ladybugs_morph_color.csv." Import that now, assign it to an object with a shorter name (e.g., "ladybugs"), and then visualize it as a tibble:
+```{r}
+ladybugs <- read_csv("ladybugs_morph_color.csv")
+ladybugs
+```
+
+Looking at it, the data is already quite tidy, with 20 rows, each representing a location at which ladybugs were observed. The "habitat" variable shows whether the observation was taken in an *industrial* or *rural* location, the "site" variable is a unique identifier for the location, the "morph_color" variable specifies which color was observed, and the "number" variable is the number of ladybugs of a given color that were observed in a given location.
+
+Although there are a variety of different analyses that could be done on these data, we will take the simple approach of comparing whether the frequencies of the two colors of ladybugs differ between the two habitat types more than might be expected just by chance. We will do so using a chi-squared contingency table analysis.
+
+### Chi-squared contingency table analysis
+The chi-squared contingency table analysis is an analysis of count data. It is essentially a test of association among two or more categorical variables. In this case, we can classify the number of ladybug observations each by two variables: habitat (industrial or rural) and morph color (black or red). To start, we need to first calculate the total number of observations in each of the four habitat/color groups.
+
+Do that using the **group_by**() and **summarize**() functions in the _**dplyr**_ package, assign the result to an object named "totals", and then visualize the output as a tibble:
+
+totals <- ladybugs %>%
+  group_by(habitat, morph_color) %>%
+  summarise(total_number = sum(number))
+totals
+```{r}
+totals <- ladybugs %>% 
+  group_by(habitat, morph_color) %>% 
+  summarize(total_number = sum(number))
+totals
+```
+
+Great! Let's make a plot now (step one in our workflow). As the data are counts, a bar graph where the height of the bar is set by the total number of observations is a perfectly reasonable way to visualize them. We can do this using the **ggplot**() and **geom_bar**() functions in the _**ggplot2**_ package.
+
+As arguments in the **aes**() function of **ggplot**(), you should specify habitat as the x-variable, total_number as the y-variable, and fill = morph_color to add color to the bars (using color = morph_color would alter the outlines of the bars instead). Don't forget the + symbol after the **ggplot** function call, to connect the next line of code.
+
+As arguments in the **geom_bar**() function, you'll want to specify stat = "identity" and position = "dodge." The first tells ggplot not to try and calculate anything from the data, but rather to just use the numbers as given. The second places the bars next to one another, rather than making the default stacked barplot. Don't forget that you can always see a list of the arguments associated with a given function using the *Help* tab in the lower right window.
+
+Let's try making the graph now:
+
+ggplot(totals, aes(x = habitat, y = total_number, fill = morph_color)) +
+  geom_bar(stat = "identity", position = "dodge")
+```{r}
+ggplot(totals, aes(habitat, total_number, fill = morph_color)) +
+  geom_bar(stat = "identity", position = "dodge")
+
+# "dodge" puts bars side by side, default is stacked
+```
+
+Well that sort of worked; however, the colors in the figure were chosen by R and are far from ideal. Black color morphs are represented by red bars and red color morphs by blue bars!!! Let's make the color of the bars correspond to the color of the ladybugs they represent. We can do this with the **scale_fill_manual**() function in _**ggplot2**_; it takes an argument called values that is a set of colors to use. In this case: scale_fill_manual(values = c(black = "black", red = "red"), which assigns the colors (in quotes) to the different levels of the morph_color variable. Remember that the **c**() function concatenates - combines - the things listed inside the parentheses...
+
+You try it:
+
+ggplot(totals, aes(x = habitat, y = total_number, fill = morph_color)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c(black = "black", red = "red")
+  )
+```{r}
+ggplot(totals, aes(habitat, total_number, fill = morph_color)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c(black = "black", red = "red"))
+```
+
+Better! At this point, we can ask ourselves whether the null hypothesis - no association between color morphs and habitat, the same relative abundance of black and red ladybugs in industrial and rural habitats - is likely to be true or not. It certainly appears as though the black morph is more common in the industrial habitat, relative to the red morph. Remember that a chi-square test compares the frequencies/proportions, not the absolute numbers. So, the fact that many more ladybugs were captured in industrial areas compared to rural ones is not something we are testing here (although we could certainly do that, it would require a different statistical approach). The figure suggests that the different ladybug morphs are *not* equally distributed among the habitats. So, we should expect to possibly reject the *reject* the null hypothesis. 
+
+To actually do the formal statistical analysis, R needs a matrix of the total counts. Although they can look superficially similar, a matrix is different from a data frame. At present, as all _**dplyr**_ functions take and give back a data frame (the tibble above is a special kind of data frame), we have all four totals in a single column of a three-column data frame assigned to the object "totals". We can transform that data frame into the matrix we need with the *xtabs*() function in base R (short for cross-tabulations).
+
+Do that now:
+
+ladybugs_matrix <- xtabs(number ~ habitat + morph_color,
+                  data = ladybugs)
+ladybugs_matrix
+```{r}
+ladybugs_matrix <- xtabs(number ~ habitat + morph_color,
+                  data = ladybugs)
+ladybugs_matrix
+```
+
+**xtabs**() requires a simple formula and a data frame. The formula asks R to *cross-tabulate* the number column of counts in the ladybugs data frame by the habitat and morph_color variables. This accomplishes exactly the same calculation as the **group_by**() and **summarize**() functions did to make totals, but puts the results in a matrix rather than a data frame. Nice.
+
+In this case, we used the raw data we read into R - the ladybugs data frame, but the function would work equally well with the summarized data, totals. (Try it if you don't believe it - just make sure to change "number" to "total_number" and "ladybugs" to "totals"):
+```{r}
+xtabs(total_number ~ habitat + morph_color,
+                  data = totals)
+```
+
+Either approach will work. At any rate, now let's do the chi-squared test using the **chisq.test**() function in base R.
+
+Type: chisq.test(ladybugs_matrix) and hit Run (and yes, it's really that simple!):
+```{r}
+chisq.test(ladybugs_matrix)
+```
+
+This rather sparse output provides all the information we need in order to interpret the graph above. According to the test, there is only a very small probability (*p* = 1.239 x 10^-5 = 0.00001239) that the patterns we see arose by chance: that is, if there really was no association between ladybug color morph and habitat, and we were to carry out the same sampling process again and again, we would get such a large value of chi-squared (*X*^2 = 19.103) only once in every 10,000 or so samples. That's a pretty good indication that the pattern we found is probably not a chance result. Of course, this *could* be the one time in 10,000 that the sample data are truly not representative of the underlying populations from which they were drawn, but it's highly unlikely. Our test results should lead us to reject the statistical null hypothesis and conclude that there likely is an association between ladybug morph color and habitat. Black morphs appear to be more frequent in industrial habitats, whereas red morphs are more frequent in rural habitats.
+
+These data are certainly consistent with our biological hypothesis that different levels of pollution lead to different color backgrounds against which insects may sit, thereby influencing predation risk in each habitat: however, we would need additional observational studies and/or experimental manipulations to determine whether those mechanisms were actually responsible for the pattern we observed.
+
+So, what might we report in a manuscript?
+
+"We tested whether there was an association between color morphs of ladybugs and habitat type. Ladybug color morphs were not distributed equally across habitats (*X*^2 = 19.1, df = 1, *p* < 0.001), with black morphs being more frequent in industrial habitats and red morphs more frequent in rural habitats (Figure X)."
+
+By the way, if you are wondering what the "Yates' continuity correction" is all about, it refers to a little adjustment of the chi-squared test that makes it a bit more reliable when the counts are small. For those of you who are familiar with the mechanics of the chi-squared test (row sums, column sums, observed and expected values), you will be pleased to know that all of these are accessible to you, simply by assigning the values returned by **chisq.test**() to a name and then asking to see it.
+
+Copy the code from the chunk above and paste it below, assign the results to ladybugs_chi (remember - if you don't do this, then as far as R is concerned, the output of the chisq.test), and then type names(ladybugs_chi):
+
+ladybugs_chi <- chisq.test(ladybugs_matrix)
+names(ladybugs_chi)
+```{r}
+ladybugs_chi <- chisq.test(ladybugs_matrix)
+names(ladybugs_chi)
+```
+
+Now that you have a list of all the different components of the chi-squared test output, you can ask to see any of them by name. For example, typing ladybugs_chi$expected will return the expected values calculated as part of the test:
+```{r}
+ladybugs_chi$expected
+```
+
+We already calculated the observed values with the *xtabs*() function above. Assuming that the proportions of the two color morphs in each habitat were equal, these are the expected counts - the numbers are slightly different because overall there were a few less black ladybugs observed than red ones in the data set (145 versus 155, respectively).
+
+It's always a good idea to check that R is doing what you think you asked it to. In this case, we can calculate the expected values to confirm them. For example, there were a total of 200 ladybugs observed in industrial habitats (115 black + 85 red), versus 100 observed in rural habitats (30 black + 70 red). Black morphs made up 145/300 = 48.33% and red morphs 155/300 = 51.67% of the total number of individuals observed. Given that, if black and red morphs were equally likely to be found in either habitat, then we would have expected to see 0.4833*200 = 96.67 black morphs in industrial habitats - exactly what was reported by R.
+
+So, that seems good! You may recall that the formula for calculating the chi-squared statistics is the sum of the squared difference between the observed and expected values in each cell, divided by the expected value. In this case:
+
+*X*^2 = ((115-96.67)^2/96.67) + ((85-103.33)^2/103.33) + ((30-48.33)^2/48.33) + ((70-51.67)^2/51.67)
+*X*^2 = 3.48 + 3.25 + 6.95 + 6.50
+*X*^2 = 20.18
+
+Hmm, that's pretty close to the reported value of 19.1, but not an exact match. Why not? Well, remember the Yate's correction? We didn't apply that in our own calculations, so that might be the answer. If we use the help function to look at the documentation for the *chisq.test*() function, we see that one of the default arguments is "correct = TRUE" and that correct is a logical indicating whether to apply continuity correction. If we were to change that to correct = FALSE, R should calculate *X*^2 in the same way we just did.
+
+Type and run:
+
+chisq.test(ladybugs_matrix, correct = FALSE):
+```{r}
+chisq.test(ladybugs_matrix, correct = FALSE)
+```
+
+And there it is...a match.
+
+Obviously, we won't do all of this sort of checking every time, but when you are learning how a new function works, it's worth some time just playing around with the code to make sure you understand exactly what R is doing.
+
+### Mosaic plots
+We visualized the ladybug habitat and color morph data with a grouped bar graph using the height of rectangular bars to display the relative frequencies of observations by habitat and color morph. An alternative option would be to use a mosaic plot, with bars within treatment groups stacked on top of one another. Within a stack, bar areas and height indicate the relative frequencies (i.e., the proportion) of the responses. This makes it easy to see the association between predictor and response variables: if an association is present in the data, than the vertical position at which the colors meet will differ between the stacks.
+
+Type and run:
+
+mosaic(number ~ habitat + morph_color, data = ladybugs_matrix,
+       highlighting = "morph_color", highlighting_fill = c("black", "red"),
+       direction = c("v", "h")
+       )
+```{r}
+mosaic(number ~ habitat + morph_color, data = ladybugs_matrix,
+       highlighting = "morph_color", highlighting_fill = c("black", "red"),
+       direction = c("v", "h")
+       )
+```
+
+Another feature of mosaic plots is that the width of each vertical stack is proportional to the number of observations in that group. In the plot above, the wider stack for the industrial habitat reflects the greater total number of individuals in this habitat compared with the number in the rural habitat (200 vs 100). As a result, the area of each box is proportional to the relative frequency of that combination of variables in the whole data set.
+
+A mosaic plot provides only relative frequencies, not the absolute frequency of occurrence in each combination of variables. This is not actually a problem here, however, as we are most interested in depicting the *pattern* in the data - the difference in the relative frequencies of ladybug color morphs in the two habitats. For that, mosaic plots work very well!
+
+Finally, we may want to tidy up the resulting figure a bit before exporting and saving it. Unfortunately, as we aren't using the _**ggplot2**_ package, it isn't necessarily obvious how to do this. The following code will work:
+
+ladybugs <- read_csv("ladybugs_morph_color.csv")
+ladybugs_matrix <- xtabs(number ~ habitat + morph_color, data = ladybugs)
+vnames <- list(set_varnames = c(habitat = "Habitat", morph_color = "Morph color"))
+lnames <- list(habitat = c("Industrial", "Rural"), morph_color = c("Black", "Red"))
+ladybugs_mosaic <- mosaic(number ~ habitat + morph_color, data = ladybugs_matrix, labeling_args = vnames, set_labels = lnames, highlighting = "morph_color", highlighting_fill = c("black", "red"), direction = c("v", "h"))
+dev.copy(png,"ladybugs_mosaic.png", width = 250, height = 250)
+dev.off()
+```{r}
+ladybugs <- read_csv("ladybugs_morph_color.csv")
+ladybugs_matrix <- xtabs(number ~ habitat + morph_color, data = ladybugs)
+vnames <- list(set_varnames = c(habitat = "Habitat", morph_color = "Morph color"))
+lnames <- list(habitat = c("Industrial", "Rural"), morph_color = c("Black", "Red"))
+ladybugs_mosaic <- mosaic(number ~ habitat + morph_color, data = ladybugs_matrix, labeling_args = vnames, set_labels = lnames, highlighting = "morph_color", highlighting_fill = c("black", "red"), direction = c("v", "h"))
+dev.copy(png,"ladybugs_mosaic.png", width = 250, height = 250)
+dev.off()
+```
+
+Confirm that there is now an image file called "ladybugs_mosaic.png" in your project folder...
+
+Well done!
+
+### Parrotfish habitat use
+Parrotfish are important members of coral reef communities because they consume macroalgae that would otherwise outcompete reef-building corals for space. Some Caribbean parrotfish species, including *Sparisoma aurofrenatum* (redband parrotfish) and *Sparisoma viride* (stoplight parrotfish) have also been reported to feed directly on living corals and seagrasses. Parrotfish populations are changing rapidly throughout the Caribbean due to a variety of natural and anthropogenic forces, including commercial and artisinal overfishing, disease, and loss of habitat due to increased incidence of major storms. As conservation efforts focus on maintaining redundancy in herbivorous guilds through marine protected areas, additional attention needs to be paid to understanding how parrotfish in coral reef ecosystems use the different habitats available to them. Nevertheless, little is known about spatial patterns of parrotfish abundance, either within or among species.
+
+SCUBA divers working for the Florida Fish and Wildlife Commission conducted fish population surveys from 2008-2010 to quantify the abundances and spatial distributions of reef fishes in the Florida Keys; coral reef habitats were categorized from most to least coral as: SG = spur and groove reef; IP = isolated patch reef; CR = coral rubble; and SS = sand and sea grass.
+
+<center>
+![Fig. 1. Stoplight parrotfish, *Sparisoma viride*](stoplight_parrotfish.jpg)
+</center>
+
+Using the fish survey data, evaluate the following question (although there are others we could also address, we'll start with this one):
+
+Do redband and stoplight parrotfish differ in their patterns of habitat association within coral reef ecosystems?
+
+As always, your workflow should be: *Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*.
+
+1. Load the specific add-on packages you will need for these analyses into R; in this case, the _**tidyverse**_ and _**vcd**_ packages:
+```{r}
+library(tidyverse)
+library(vcd)
+```
+
+2. Import the "parrotfish_abundances.csv" data file into R, give it a short descriptive name (e.g., "parrotfish"), and view it as a tibble:
+```{r}
+parrotfish <- read_csv("parrotfish_abundances.csv")
+parrotfish
+```
+
+3. Calculate the total number of observations in each combination of habitat/species, assign the data returned to an object named parrotfish_totals, and view it as a tibble. We can do this using the **group_by**() and **summarize**() functions, connected by pipes (%>%):
+```{r}
+parrotfish_totals <- parrotfish %>%
+  group_by(habitat, species) %>% 
+  summarize(total_number = sum(number))
+parrotfish_totals
+```
+
+4. Plot the parrotfish_totals data as a bar chart.
+```{r}
+ggplot(parrotfish_totals, aes(habitat, total_number, fill = species)) +
+  geom_bar(stat = "identity", position = "dodge")
+```
+
+Well, that's a graph! But the ordering of habitat types doesn't really make any sense (the default ordering in R is alphabetical). Given our overarching question, it might make more sense to arrange the habitats from most to least amount of coral: SG = spur and groove reef; IP = isolated patch reef; CR = coral rubble; and SS = sand and sea grass. 
+
+5. Copy and modify the code chunk from step 3 above to reorder the levels of habitat in the parrotfish data frame from most to least coral, calculate the total number of observations in each combination of habitat/species, assign the data returned to an object named parrotfish_totals, and view it as a tibble. We can do this using the **mutate**(), **fct_relevel**(), **group_by**() and **summarize**() functions, connected by pipes (%>%) (check last week's assignment if you don't remember exactly how to do this):
+```{r}
+parrotfish_totals <- parrotfish %>%
+  mutate(habitat = as_factor(habitat)) %>% 
+  mutate(habitat = fct_relevel(habitat, "spur and groove reef", "isolated patch reef", "coral rubble", "sand and sea grass")) %>% 
+  group_by(habitat, species) %>% 
+  summarize(total_number = sum(number))
+parrotfish_totals
+```
+
+Check the order of rows in the new tibble against those in the previous one - looks like the re-ordering worked.
+
+6. Now remake the bar chart; the order of habitats should match that of the tibble above:
+```{r}
+ggplot(parrotfish_totals, aes(habitat, total_number, fill = species)) +
+  geom_bar(stat = "identity", position = "dodge")
+```
+
+Looks good! What would you say are the key takeaways from that figure? It looks like there are consistently more parrotfish in areas with healthy coral (~3 times as many); there are consistently more *S. aurofrenatum* than *S. viride* (~2.5 times as many); and the two species do not appear to differ in their patterns of habitat association within coral reef ecosystems. We should, however, evaluate that last result formally with a statistical test - like chi-squared.
+
+7. Cross-tabulate the parrotfish data by habitat and species, transform the data frame to a matrix, and assign it to an object named parrotfish_matrix;
+```{r}
+parrotfish_matrix <- xtabs(number ~ habitat + species,
+                  data = parrotfish)
+parrotfish_matrix
+```
+
+8. Using a chi-squared analysis, test whether there is an association between coral reef habitat type, species identity, and parrotfish abundance:
+```{r}
+chisq.test(parrotfish_matrix)
+```
+
+9. Using Figure 2 below as a guide, make a publication quality plot of the parrotfish_totals data and export and save it to your project folder as a .png file (sized 5 in wide x 3 in high). You should know by now how to make most of the changes you can see, but you may want to also investigate the following additional functions in **ggplot**:
+
+theme_minimal()
+theme(legend.position, legend.justification)
+scale_fill_discrete(labels)
+guides(fill = guide_legend(title = NULL))
+
+<center>
+![Fig. 2. Example bar chart.](example_parrotfish_fig.png)
+</center>
+```{r}
+ggplot(parrotfish_totals, aes(habitat, total_number, fill = species)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_light() +
+  theme(legend.position = c(.95, .95), legend.justification = c("right", "top")) +
+  scale_fill_discrete(name = "Parrotfish species", labels = c("Redband", "Stoplight")) +
+  xlab("Coral Reef Habitat") +
+  ylab("Abundance") +
+  ggtitle("Parrotfish Abundances in Coral Reef Habitats") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggsave("parrotfish_plot.png", width = 5, height = 3, units = "in")
+```
+
+10. Report your interpretation of the results of your analyses, in light of your original questions. Be specific; use evidence from your analyses above to support your claims:
+
+**Do redband and stoplight parrotfish differ in their patterns of habitat association within coral reef ecosystems?**
+
+When considering only total counts, there are generally more parrotfish in habitat types with higher amounts of coral. There are also more redband parrotfish than stoplight parrotfish, regardless of habitat type. However, a statistical analysis does not indicate that there is a significant association between coral reef habitat type, parrotfish species, and abundance. The results of the chi-squared indicate that we accept reject the null hypothesis that there is no difference in species patterns of habitat association.
+
+**Write a complete figure caption to accompany the graph you produced in step 9.**
+
+We tested whether there was an association between parrotfish species abundance and habitat type. The results of the chi-squared test (*X*^2 = 3.3295, df = 3, *p* = 0.3436) indicate there is no significant difference in each species' abundance based on coral habitat type. However, the plot shows that redband parrotfish were found more abundantly in each habitat type (see figure above).
+
+
+### Wrapping up
+Save your file and exit the R session.

@@ -1,0 +1,401 @@
+---
+title: "Chapter 5d One-Way ANOVA"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifictions) the text of Chapter 5 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "LastName_ch5c.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Visualize continuous response data grouped by a categorical explanatory factor with exploratory boxplots and interpret the basic patterns;
+
+* Analyze the data formally with one-way analysis of variance (ANOVA);
+
+* Evaluate assumptions of normality and equal variances of residuals with residuals plots;
+
+* If appropriate, follow up the overall ANOVA with Tukey's multiple comparisons tests to identify which group means are different;
+
+* Create a high-quality figure to communicate the results;
+
+* Correctly interpret the results.
+
+### Introduction
+The final statistical test we will explore in this chapter is one-way analysis of variance (ANOVA). The one-way ANOVA is in some ways a simple extension of the *t*-test that allows us to test for differences in the means of two or more levels of a given categorical variable.
+
+As always, our workflow remains the same:
+
+*Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis. For this exercise, we will minimally need the _**Hmisc**_, _**tidyverse**_, _**ggfortify**_, and _**multcomp**_ packages. If you want to replicate the final example figure exactly, you will also need the _**RColorBrewer**_ and _**cowplot**_ packages. You will likely need to install the _**multcomp**_, _**RColorBrewer**_ and _**cowplot**_ packages before you can load them.
+
+Type:
+library(Hmisc)
+library(tidyverse)
+library(ggfortify)
+library(multcomp)
+library(RColorBrewer)
+library(cowplot)
+```{r}
+install.packages(c("multcomp", "cowplot"))
+library(Hmisc)
+library(tidyverse)
+library(ggfortify)
+library(multcomp)
+library(RColorBrewer)
+library(cowplot)
+```
+
+### Water flea growth rates
+The data set we will use is of water fleas (*Daphnia* spp.) and their parasites. We want to know whether parasites alter water flea growth rates, and if so, which parasite(s).
+
+The data are available in a file called "daphnia_growth.csv." Import that now, assign it a short descriptive name (i.e., "daphnia"), and then visualize it as a tibble.
+
+Type:
+daphnia <- read_csv("daphnia_growth.csv")
+daphnia
+```{r}
+daphnia <- read_csv("daphnia_growth.csv")
+daphnia
+```
+
+The data frame has three columns, two of which we will use in our analysis: parasite, a categorical variable coded as as a character string <chr> and growth_rate, a continuous variable coded as a number <dbl>. The third variable, replicate, indicates the replication in each treatment level, but is not particularly relevant in this context. It turns out that we will eventually need for parasite to be coded as a factor instead of a character string (R handles the two kinds of data differently, particular when calculating statistics). Let's go ahead and do that now.
+
+Type:
+daphnia <- daphnia %>%
+  mutate(parasite = as_factor(parasite))
+daphnia
+```{r}
+daphnia <- daphnia %>% 
+  mutate(parasite = as_factor(parasite))
+```
+
+Great! You can see that parasite is now coded as as a factor <fctr>, while the other two variables are unchanged.
+
+Making a figure of these data needs a bit of thinking - recall from Chapter 4 that a box-and-whisker plot is an effective way to summarize variation in a response variable as a function of a categorical grouping variable. Let's start there.
+
+Type:
+ggplot(data = daphnia, aes(x = parasite, y = growth_rate)) +
+  geom_boxplot() +
+  theme_bw()
+```{r}
+ggplot(daphnia, aes(parasite, growth_rate)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+So, this looks pretty good, except for the fact that (depending upon your screen size) the parasite names take up a lot of space and/or may be mashed together and impossible to read. Chapter 8 provides a series of tools to manipulate axes and other attributes of your plots, as do external resources such as the *R Graphics Cookbook*. For now, however, we'll try a quick trick called coordinate flipping: we can just switch the *x*- and *y*-axes using the **coord_flip**() function. Modify the code from the chunk above, adding coord_flip() on a new line at the bottom (don't forget the plus sign!):
+
+Type:
+ggplot(data = daphnia, aes(x = parasite, y = growth_rate)) +
+  geom_boxplot() +
+  theme_bw() +
+  coord_flip()
+```{r}
+ggplot(daphnia, aes(parasite, growth_rate)) +
+  geom_boxplot() +
+  theme_bw() +
+  coord_flip()
+```
+
+Better! It's not perfect, but at least we can read the parasite names now and start figuring out what the data are showing us. Note how the order of the category levels is translated from one axis to the other - e.g., the control group was closest to the origin on the *x*-axis, and it retains that positioning when flipped to the *y*-axis.
+
+The first thing we should note is that there is substantial variation in daphnia growth rates among the four treatment groups. Second, we can see that the control treatment produces the highest growth rate, about 1.2 mm/day. Third, we can see *P. perplaxa* is closest to the control, but perhaps a bit lower, *M. bicsupidata* is next lowest, and *P. ramosa* definitely produced the lowest growth rate. Or at least it looks that way. The point is, we can see that there is likely to be both a parasite treatment effect overall and an ordering of the growth rates, with parasites generally driving down the daphnia growth rate, and *P. ramosa* < *M. bicsupidata* < *P. perplaxa*.
+
+You can go even further if you wish, estimating the average growth rates in each treatment, and the difference of the parasite treatments from the control treatment (i.e., the effects of each parasite on growth rate). You could also figure out the degrees of freedom for the treatment and error terms in the ANOVA model. It's very good practice to do this now and then check that R reports what you expect.
+
+With that in mind, let's construct our linear model that does a one-way ANOVA. We will do that with the **lm**() function - yep, the same one you used in the previous section on simple linear regression analysis...
+
+This should be familiar. The function has the same structure as before, except that the explanatory variable is a categorical rather than continuous variable. We don't even have to tell R about this, as that information is already specified in the tibble: e.g., <chr> or <fct> instead of <dbl>. Once we construct the model, we should also construct the four diagnostic graphs of the model residuals to check the assumptions associated with linear models. They are the same for regression and one-way ANOVA, so we can and evaluate them in exactly the same way.
+
+Type:
+growth_model <- lm(growth_rate ~ parasite, daphnia)
+autoplot(growth_model, smooth.colour = NA)
+```{r}
+growth_model <- lm(growth_rate ~ parasite, daphnia)
+autoplot(growth_model, smooth.colour= NA)
+```
+
+Briefly, these figures suggest that everything is probably fine. You may be uncomfortable with the Q-Q plot in the upper right panel, evaluating the normality of the residuals; however, this pattern is probably within the expected bounds of variation found in samples of the normal distribution. (It can take a while before you have seen enough different Q-Q plots to develop your intuition about this.) At any rate, if there is a real departure from normality here, it isn't too excessive and ANOVA is fairly robust to that sort of thing. In other words, the *P*-values we get will probably be OK.
+
+We are going to consider the model assumptions met, and move on to interpreting the output of the two tools for making inferences from linear models: **anova**() and **summary**(). Yes, we are going to apply the function **anova**() to a one-way ANOVA. When we do that, we will get an answer to our first question: does daphnia growth rate differ, on average, among any of the treatment groups? 
+
+Type:
+anova(growth_model)
+summary(growth_model)
+```{r}
+anova(growth_model)
+summary(growth_model)
+```
+
+The output looks remarkably similar to that from a regression, and it should. They are both just linear models. We can see that there is indeed evidence that the parasite treatment, comprising four levels of manipulation, has produced an effect.
+
+It is worth considering exactly what the null hypothesis is for a one-way ANOVA: that all of the groups come from populations with the same mean. The *F*-value quantifies how likely this is to be true. It is the ratio of the among-group variance to the within-group variance. If there was no added variation in daphnia growth rates among treatment groups, then the two variance estimates would be similar and *F* would equal approximately one. In this case, however, the former is large relative to the latter, suggesting that there is additional variation in growth rates depending upon which treatment group an individual was assigned. This pattern produces a large *F*-value, and thus a small *P*-value. The probability of getting an *F* = 32.33, if the null hypothesis were true, is very small (*P* << 0.001). As a consequence, we can fairly confidently reject the null hypothesis and conclude instead that there are likely real differences in daphnia growth rate among the treatment groups.
+
+Given that parasites alter water flea growth rates, which one(s) cause them to differ? This is a question that can be answered in many ways - we're going to look at one in detail and discuss a few others.
+
+Interpreting the information provided by R in the summary table can be a little complicated. Make sure that you understand exactly what this table is showing you; if not, you won't be able to interpret your results. Basically, R is presenting so-called "treatment contrasts," the expression of model coefficients generated as the pairwise differences between treatment group means. The first row labeled "(Intercept)" has an Estimate of 1.214 - the mean growth rate in the Control treatment (note that "Control" does not appear in the list). This is the reference level; because we didn't specify any particular group as the reference, R defaulted to the first one in the alphabetical list. The other estimates report the *differences* in mean growth rate between the reference level and the other levels. So for example, daphnia in the *M. bicuspidata* treatment group grew on average -0.413 mm per day less than did daphnia in the Control group. The actual growth estimate is therefore 1.214 - 0.413 = 0.801, which looks to be about what we would expect, based on the plot we made previously.
+
+For comparison, you can calculate the treatment contrasts yourself by generating the means for each group using the **group_by**() and **summarise**() functions.
+
+Type:
+growth_means <- daphnia %>%
+  group_by(parasite) %>%
+  summarise(mean_growth = mean(growth_rate))
+growth_means
+```{r}
+growth_means <- daphnia %>% 
+  group_by(parasite) %>% 
+  summarise(mean_growth = mean(growth_rate))
+growth_means
+```
+
+Note the alphabetical ordering of the different levels of parasite. R is nothing if not consistent! Looks like our calculation of the growth rate of daphnia in the *M. bicuspidata* group was spot on. Alternatively, subtracting a given treatment growth rate from the control growth rate will give you the relevant contrast for that group. For example, considering *P. ramosa*: 0.482 - 1.214 = -0.732, exactly what was reported in the summary table above.
+
+We were lucky here in that the control group ended up as the reference group. This means the *P*-values associated with the contrasts may actually be useful, as they tell us whether any observed difference between the growth rate in a given parasite treatment versus the control is statistically significant. That doesn't always happen - we'll cover what to do in that case a little later. At any rate, you may recall that if we reject the null hypothesis for a one-way ANOVA, we have concluded that not all of the group means are equal. However, we don't yet know which particular means are different. While we could in theory use the individual *P*-values reported in the summary above to decide whether each group differed from the control, that wouldn't tell us whether say *M. bicuspidata* differed from *P. ramosa*.
+
+Also, remember that for every hypothesis test you perform, there is some non-zero probability of making a type I error. In other words, there’s a chance that you’ll mistakenly reject a null hypothesis that is actually true. When you perform only one test, the type I error rate equals your *P*-value. However, as you conduct more and more tests, your chance of a false positive increases. If you perform enough tests, you’re virtually guaranteed to reject the null hypothesis incorrectly at some point! The formula for the maximum number of comparisons you can make for N groups is: (N*(N-1))/2. So in this case, with N = 4 groups, there are six possible pairwise (between two groups) comparisons. Let's say there was a 1/20 (5%) chance of making a type I error with each individual comparison. If we did all six comparisons, the chance that we would make a type I error at least once is no longer 5%; instead, it is over 26%. That's pretty high! To make things worse, we wouldn't know which specific null hypothesis was rejected incorrectly. Post-hoc tests (in Latin, post-hoc means 'after this') can be used to explore differences between multiple group means while controlling the overall error rate.
+
+There are a variety of post hoc tests you can choose from, but Tukey’s method is probably the most common for comparing all possible group pairings - that's the one we'll use here. The **glht** (general linear hypothesis test) function in the _**multcomp**_ package will do this; however, it will only work if the categorical explanatory data is classified as a factor (which is why we did that earlier).
+
+Type:
+tukeys <- glht(growth_model, linfct = mcp(parasite = "Tukey"))
+summary(tukeys)
+```{r}
+tukeys <- glht(growth_model, linfct = mcp(parasite = "Tukey"))
+summary(tukeys)
+```
+
+Okay, that looks a bit messy, but it's actually pretty easy to interpret. Each linear hypothesis listed is a comparison between the means of two of the groups in our analysis - the (null) hypothesis is that the means are the same - the difference between them equals 0. The other columns report the estimated difference calculated from the sample data, the standard error of the difference, and the *t*- and *P*-values associated with each comparison. Note that the estimated standard error is the same across all comparisons - one of the key assumptions of ANOVA is that of equal variances in each group. A small *P*-value suggests that the null hypothesis should be rejected. According to the summary above, there is no evidence that daphnia growth rate in the *P. perplexa* treatment group differs from that of the control group; however, the other two parasite groups differ from both of them and each other.
+
+You may be more familiar with seeing Tukey's results displayed as letters associated with each group. We can take the output above and convert it to a 'compact letter display' (cld), then convert the cld to a data frame with the **fortify**() function, and rename the resulting 'lhs' column to 'parasite' (not really necessary, but it keeps everything tidy).
+
+Type:
+tukeys_cld <- cld(tukeys) %>%
+  fortify() %>%
+  rename(parasite = lhs)
+tukeys_cld
+```{r}
+tukeys_cld <- cld(tukeys) %>% 
+  fortify() %>% 
+  rename(parasite = lhs)
+tukeys_cld
+```
+
+Different letters denote groups that are statistically different from one another; groups that have the same letters are not different.
+
+Finally, you should produce a high-quality figure like the one below. You'll need to specify two geom layers: **geom_crossbar**() which displays the mean and 95% CI for each group and **geom_point**() which displays the raw data as an overlay. In order to italicize the species names, we need to first create a separate object called x_labels, which we include later. We can use the **geom_text**() function to add a text layer to the plot (in this case, the Tukeys results) and **geom_hline**() to add a horizontal line (remember that the reason it looks vertical in this plot is because we flipped the coordinates). Take a few minutes to play around with the different lines of code: try deleting each one, changing the settings, etc. and then re-running the code chunk to see how the figure has been altered as a result.
+
+Note the use of the **bquote**() function to incorporate math notation and other text modifications into plot labels. This [R-bloggers post](https://www.r-bloggers.com/2018/03/math-notation-for-r-plot-titles-expression-and-bquote/) does a pretty good job of explaining the basic rules for creating complex labels in R with **bquote**. Also, search for the help topic 'plotmath' to learn more about math notation in R.
+
+<center>
+![Fig. 1. Example figure.](example_daphnia_fig.png)
+</center>
+
+Type:
+x_labels <- c("Control",
+              bquote(italic("Metchnikowia bicuspidata")),
+              bquote(italic("Pansporella perplexa")),
+              bquote(italic("Pasteuria ramosa"))
+              )
+
+daphnia_fig <- ggplot(data = daphnia, aes(x = parasite, y = growth_rate, color = parasite, fill = parasite)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.6, alpha = 0.2) +
+  geom_jitter(width = 0.05, size = 3, alpha = 0.8) +
+  scale_x_discrete(labels = x_labels) +
+  scale_y_continuous(limits = c(0, 1.5)) +
+  ylab(bquote(italic("Daphnia")~" growth rate (mm "*d^-1*")")) +
+  geom_text(data = tukeys_cld, aes(x = parasite, y = 1.5, label = letters), color = "black", size = 4) +
+  geom_hline(aes(yintercept = 1.21391), linetype = "longdash") +
+  theme_bw() +
+  coord_flip() +
+  theme(axis.title.y = element_blank(),
+        legend.position="none")
+daphnia_fig
+```{r}
+x_labels <- c("Control",
+              bquote(italic("Metchnikowia bicuspidata")),
+              bquote(italic("Pansporella perplexa")),
+              bquote(italic("Pasteuria ramosa"))
+              )
+
+daphnia_fig <- ggplot(data = daphnia, aes(x = parasite, y = growth_rate, color = parasite, fill = parasite)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.6, alpha = 0.2) +
+  geom_jitter(width = 0.05, size = 3, alpha = 0.8) +
+  scale_x_discrete(labels = x_labels) +
+  scale_y_continuous(limits = c(0, 1.5)) +
+  ylab(bquote(italic("Daphnia")~" growth rate (mm "*d^-1*")")) +
+  geom_text(data = tukeys_cld, aes(x = parasite, y = 1.5, label = letters), color = "black", size = 4) +
+  geom_hline(aes(yintercept = 1.21391), linetype = "longdash") +
+  theme_bw() +
+  coord_flip() +
+  theme(axis.title.y = element_blank(),
+        legend.position="none")
+daphnia_fig
+```
+
+Well done! Now you try...
+
+### Ocean acidificaiton and food subsidies
+Global increases in the partial pressure of CO2 (*p*CO2) in seawater over recent decades have resulted in associated reductions in pH, so-called ocean acidification (OA), in both open ocean and coastal habitats. Adjusting physiologically to high pCO2/low pH levels requires a significant energetic investment for many marine organisms, especially those that construct their skeletons and shells out of calcium carbonate (CaCO3). As a consequence, accelerating changes in ocean carbonate chemistry over the next century are generally expected to have dramatic effects on marine population dynamics, species interactions, and the structure of ecological communities. Specific predictions, however, are complicated by the fact that multiple factors acting together can either exacerbate or mitigate negative impacts of perturbations to biological systems. For example, energetic costs of responding to OA may increase the susceptibility of individuals to other risk factors (e.g., reduced growth rate, shell thickness, or attachment strength can lead to decreased competitiveness or increased risk of predation or dislodgement). At the same time, variation in other factors such as nutritional status or source population may minimize or even eliminate observed phenotypic effects.
+
+Upwelling of dissolved inorganic carbon (DIC)-rich waters within the California Current Large Marine Ecosystem (CCLME), combined with a relatively narrow shelf, makes the coastal waters of northern California an OA hotspot. Some nearshore areas already routinely experience levels of pCO2/pH not predicted for the open ocean until the end of the century. Typically occurring from April to October, upwelling exposes many species, even those found in the intertidal zone, to high pCO2/low pH waters during critical periods for recruitment and growth. The CCLME in northern California is naturally divided into two regions north and south of Cape Mendocino, CA (~40.5°N): north of Cape Mendocino, seasonal upwelling produces consistently lower and more variable pH exposures, whereas the pH of coastal waters south of Cape Mendocino rarely falls below 7.75. This pattern of spatial structuring has been shown to be highly persistent across years. Fig. 2 below (from Feely et al. 2008) shows the distribution of depths of acidified water (aragonite saturation < 1.0; pH < 7.75) on the continental shelf of western North America. Near the Humboldt State University (HSU) Marine Lab, corrosive water reaches the surface very close to the coast. Yellow dots represent sampling locations for this project.
+
+<center>
+![Fig. 2. Study site map.](study_map.png)
+</center>
+
+Fig.3 below shows the pH of seawater in the intertidal zone at the four study sites during the spring and summer of 2012-2013 (data from Menge et al. 2015 (CB, CM, KH) and CeNCOOS (TP)). CB = Cape Blanco, TP = Trinidad Pier, CM = Cape Mendocino, and KH = Kibasillah Hill. The vertical gray dashed line represents Cape Mendocino - sites to the left of the line are located north of Cape Mendocino and sites to the right are south.
+
+<center>
+![Fig. 3. Study site intertidal pH.](intertidal_pH.png)
+</center>
+
+The same oceanographic processes that generate variation in pCO2/pH can also influence the delivery of phytoplankton to intertidal sites, with potentially large effects on local population dynamics and community structure. Previous field observations have found that growth of mussels, *Mytilus californianus*, in the CCLME is highest in areas where frequent low pH is common, suggesting that increased food availability may mediate any negative effects of low pH. To evaluate this hypothesis, mussel food availability at sites north and south of Cape Mendocino was characterized as the concentration of the photosynthetic pigment chlorophyll *a* (chl *a*) in bulk seawater samples; chl *a* is a common proxy for phytoplankton abundance.
+
+Using chl *a* data collected over the same two years, evaluate the following questions:
+
+* Are there consistent differences in average chl *a* concentrations across the different study sites?
+
+* If so, which sites differ from the others?
+
+* Are the patterns in the data (if any), consistent with the idea that increased food availability associated with upwelling may explain the otherwise paradoxical observation that mussel growth is higher at sites north of Cape Mendocino, in spite of expected negative effects of low pH?
+
+As always, your workflow should be: *Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*.
+
+1. Import the "chl_a.csv" data into R, give it a short descriptive name (e.g., "chl_a"), reorder the sites from north to south, create a new column of lo10-transformed data, and view it as a tibble. Note that we can force R to classify 'year' as a factor with the **col_types**() function; similarly, using the **fct_relevel**() function on the 'site' data accomplishes the same thing. We will need site to be classified as a factor later if we need to use Tukey's tests to differentiate among groups.
+
+Type:
+chl_a <- read_csv("chl_a.csv", col_types = cols(year = col_factor())) %>%
+  mutate(site = fct_relevel(site, "CB", "TP", "CM", "KH")) %>%
+  mutate(log10_chl = log10(chl_a))
+chl_a
+```{r}
+chl_a <- read_csv("chl_a.csv", col_types = cols(year = col_factor())) %>% 
+  mutate(site = fct_relevel(site, "CB", "TP", "CM", "KH")) %>%
+  mutate(log10_chl = log10(chl_a))
+chl_a
+```
+
+2. Make box-and-whisker plots summarizing variation in chl *a* as a function of site.
+```{r}
+ggplot(chl_a, aes(site, chl_a, color = site)) +
+  geom_boxplot() +
+  theme_classic()
+```
+
+Unlike with the daphnia example above, there's no real need to use the **coord_flip**() function with this plot. One potentially concerning issue is that the variability in chl *a* concentration appears to be quite different from site to site. That may be a problem, given that ANOVA assumes the data are equally variable in all groups. We'll want to pay attention to that when we examine the diagnostic residuals plots.
+
+3. Construct a linear model that does a one-way ANOVA and visualize the four diagnostic graphs of the model residuals to check the assumptions associated with linear models.
+```{r}
+chl_model1 <- lm(chl_a ~ site, chl_a)
+autoplot(chl_model1, smooth.colour = NA)
+```
+
+As we thought, looking at the residuals vs fitted or residuals vs factor levels plots, it appears as though the variability in chl *a* measurements is particularly high at Cape Blanco. In fact, the overall pattern seems to be that as mean chl *a* concentration increases across the sites, so too does the variance. That's a common feature of many types of biological data and often results in what is called a log-normal distribution. Looking at the normal Q-Q plot, we can see that the larger values in the dataset don't fall very close to the diagonal line. That should not be surprising, given that we just decided the data likely had a log-normal, not a normal, distribution. The bad news is that this means that at least two of the assumptions of ANOVA are violated by these data, so we probably can't analyze them as they are. The good news is that this type of pattern is easy to fix - instead of analyzing the raw untransformed data, we can take the log of each chl *a* value and analyze those data instead. Log-transforming data with a log-normal distribution will tend to make it more normal and will affect larger values more than smaller ones, also equalizing the variances.
+
+4. Construct a new linear model that does a one-way ANOVA on the log10_chl data and visualize the four diagnostic graphs of the model residuals to check model assumptions.
+```{r}
+chl_model2 <- lm(log10_chl ~ site, chl_a)
+autoplot(chl_model2, smooth.colour = NA)
+```
+That looks much better!
+
+5. Summarize the results of the analysis with a classic ANOVA table and estimates of the treatment contrasts (the expression of model coefficients generated as the pairwise differences between treatment group means). Remember that we want to look at the log-transformed data only.
+```{r}
+anova(chl_model2)
+summary(chl_model2)
+```
+
+6. If the null hypothesis for the overall ANOVA is rejected, use Tukey’s method to make all possible pairwise comparisons among sites.
+```{r}
+tukeys_chl <- glht(chl_model2, linfct = mcp(site = "Tukey"))
+summary(tukeys_chl)
+```
+
+7. Now convert the above results to a 'compact letter display' (cld) as a data frame, renaming the resulting 'lhs' column 'site.'
+```{r}
+tukeys_chl_cld <- cld(tukeys_chl) %>% 
+  fortify() %>% 
+  rename(site = lhs) %>%
+  mutate(letters = fct_recode(letters, a = "b", b = "a"))
+tukeys_chl_cld
+```
+
+8. Produce a high-quality figure using the one below as a guide. You'll want to replicate several things we've done previously, so check back over the past few R Coding Assignments for code you can copy and then modify.
+
+NOTE: We did not analyze the chlorophyll data by year, however, we can still highlight the different years using another aesthetic - e.g., shape. Try to see if you can figure out how to do that using the "aes(shape = year)" argument in the **geom_jitter**() function.
+
+ADDITIONAL NOTE: As we analyzed the log10-transformed data, that's really what we should display in our plot; however, as most people don't interpret log-transformed values very well, it would be best to show them in a format that is more interpretable. Remember that we did that previously by displaying the untransformed (chl_a) data on log10 scale using the **scale_y_log10**() function.
+
+ONE MORE NOTE: R doesn't always report Tukey's results in the most useful format. The output in the cld lists the letter 'b' for sites CB and TP; however, as they are the first sites on our graph (reading from left to right), we would probably rather have those sites be 'a' and the others 'ab' and 'b', respectively. That's easy enough to fix by adding the following code into the chunk above: 
+
+  %>%
+  mutate(letters = fct_recode(letters, a = "b", b = "a"))
+
+FINAL NOTE: You do not need to include units in your y-axis label (although you are welcome to try - if so, you may want to investigate the **bquote**() function in base R); nor do you need to match the color palette or plot theme. That said, if you want to try, the color palette is 'Dark2' from the _**RColorBrewer**_ package and the theme is from the _**cowplot**_ package. Try including the following lines of code in your **ggplot**() chunk:
+
+  scale_color_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_cowplot(12)
+
+<center>
+![Fig. 4. Example figure.](example_chl_fig.png)
+</center>
+
+```{r}
+devtools::install_github("an-bui/calecopal", force = TRUE) 
+library(calecopal) # install color package
+
+chl_a_fig <- ggplot(data = chl_a, aes(x = site, y = chl_a, color = site, fill = site)) +
+  geom_crossbar(stat = "summary", fun.data = "mean_cl_normal", width = 0.6, alpha = 0.4) +
+  geom_jitter(aes(shape = year), width = 0.05, size = 3, alpha = 0.9) +
+  scale_y_log10() +
+  geom_vline(aes(xintercept = 2.5), linetype = "longdash") +
+  geom_text(data = tukeys_chl_cld, aes(x = site, y = 30, label = letters), color = "black", size = 5) +
+  xlab("Study Site") +
+  ylab(bquote("Chlorophyll"~italic("a") ~ "concentration (ug "*L^-1*")")) +
+  theme_classic() +
+  theme(legend.position="none") +
+  scale_color_manual(values = cal_palette(n = 4, "superbloom3")) +
+  scale_fill_manual(values = cal_palette(n = 4, "superbloom3"))
+chl_a_fig
+```
+
+
+9. Export and save the plot to your Projects folder as a .png file (sized 4 in wide x 3 in high with **ggsave**().
+```{r}
+ggsave("chl_plot.png", chl_a_fig, width = 4, height = 3)
+```
+
+Nice!
+
+10. Use the results of your analyses above to answer the questions in the associated Quiz in BeachBoard.
+
+So, the take-home messages from this chapter are:
+
+* Have a consistent workflow for analyses;
+
+* Always make a graph that answers your question before touching any statistical tests;
+
+* Interpret as much as you can, for example slopes, intercepts, contrasts, and degrees of freedom, from your graph *before doing any statistics*;
+
+* Check if your data violate any assumptions, *before* interpreting your model results;
+
+* Make a beautiful graph to communicate your results, and write a biologically focused (rather than statistically focused) description of your results;
+
+* R makes all this very easy.
+
+### Literature Cited
+Feely, R. A., Sabine, C. L., Hernandez-Ayon, J. M., Ianson, D., & Hales, B. (2008). Evidence for upwelling of corrosive "acidified" water onto the continental shelf. Science, 320(5882), 1490-1492.
+
+Menge, B. A., Menge, B. A., Russell, A. D., Blanchette, C. A., Sanford, E., Chavez, F., Chan, F., Menge, B. A., Russell, A. D., Chan, F., Hill, T., Nielsen, K. J., Hacker, S. D., Washburn, L., Gaylord, B., Friederich, G., McManus, M. A., Raimondi, P. T., Barth, J. (2015) Moorings temperature and pH from multiple sites in the California Current System starting 2008 (OMEGAS-MaS project, ACIDIC project). Biological and Chemical Oceanography Data Management Office (BCO-DMO). Version Date 2015-05-28.
+
+### Wrapping up
+Save your file and exit the R session.

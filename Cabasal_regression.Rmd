@@ -1,0 +1,273 @@
+---
+title: "Chapter 5c Linear Regression Analysis KEY"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 5 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "Your Last Name_ch5b.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Visualize continuous data with exploratory scatter plots and interpret the basic patterns;
+
+* Analyze the data formally with simple linear regression;
+
+* Evaluate assumptions of linearity, normality and equal variances of residuals, and limited influence with residuals plots;
+
+* Create a publication-quality figure to communicate the results;
+
+* Correctly interpret the results.
+
+### Introduction
+In this section we will focus on linear models, specifically simple linear regression.
+
+Remember to work through the following sequence (presented in more detail in the text):
+
+*Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis. For this exercise, we will need the _**gridExtra**_, _**tidyverse**_, and _**ggfortify**_ packages; you may need to install _**gridExtra**_ (see section 8.2 in *Getting Started with R*) before you can do this.
+
+Type:
+library(gridExtra)
+library(tidyverse)
+library(ggfortify)
+```{r}
+library(gridExtra)
+library(tidyverse)
+install.packages("ggfortify")
+library(ggfortify)
+```
+
+### Plant growth rate
+For this exercise, we’ll be working with data on the growth rate of plants as a function of soil moisture content. The underlying prediction is that more moisture will likely support higher growth rates.
+
+The data are available in a file called "plant_growth_rate.csv." Import that now, assign it to an object with a shorter name (e.g., "plant_gr"), and then visualize it as a tibble.
+
+Type:
+plant_gr <- read_csv("plant_growth_rate.csv")
+plant_gr
+```{r}
+plant <- read_csv("plant_growth_rate.csv")
+plant
+```
+
+Looking at it, the data are what we expect: two continuous variables. (Remember that <dbl> in R refers to "double floating point" numbers, whereas <chr> refers to "character strings" - words.)
+
+### Simple linear regression analysis
+Two key features of the data are important for a simple linear regression analysis. The first is that we have a clear linear relationship specified between two variables, one that is easily visualized by plotting the response (dependent; y-axis) variable against the explanatory (independent; x-axis) variable. The second is that both variables are continuous - they don't have categories.
+
+Let's make a plot now (step one in our workflow). We can do this using the **ggplot**() and **geom_point**() functions in the _**ggplot2**_ package. As arguments in the **aes**() function of **ggplot**(), you should specify soil_moisture_content as the x-variable and plant_growth_rate as the y-variable.
+
+Type:
+ggplot(data = plant_gr, aes(x = soil_moisture_content, y = plant_growth_rate)) +
+  geom_point() +
+  theme_bw()
+```{r}
+ggplot(plant, aes(soil_moisture_content, plant_growth_rate)) +
+  geom_point() +
+  theme_classic()
+```
+
+Nice! It's important to realize that an exploratory graph needn't be beautiful - clarity and speed are priorities. Now interpret the figure:
+
+First, the relationship appears to be generally linear and positive - the more moisture in the soil, the higher the plant growth rate. Good; that seems biologically reasonable and the relationship can be described with a line.
+
+Second, you can estimate the parameters of the linear equation (y = b + ax; where y = plant growth rate, b = the intercept, a = the slope, and x = soil moisture content) . Roughly speaking, the growth rate varies between 20 and 50 mm/week and the soil moisture content varies between 0 and 2 (check the scaling of the x- and y-axes). Thus, the gradient (slope; a) is approximately (50-20)/(2-0) = 30/2 = 15. The growth rate when soil moisture content is zero (intercept, b) is somewhere between 15 and 20 mm/week.
+
+It's always a good idea to examine your data before you do any formal analyses; if for no other reason that to have some idea about what your results should look like. You can push yourself even further by figuring out, in advance, the degrees of freedom for error that you expect. HINT: for regression, its the number of data points minus the number of parameters (also called coefficients) estimated. In this case, we are estimating the slope and intercept of a line, so df = 50-2 = 48.
+
+Now make the model using the **ln**() function (for "linear model") and assign it to an object named model_pgr. Before we look at the output, however, we should check the assumptions of the model. We can do this with the **autoplot**() function in the _**ggfortify**_ package.
+
+Type:
+model_pgr <- lm(plant_growth_rate ~ soil_moisture_content, data = plant_gr)
+autoplot(model_pgr, smooth.color = NA)
+```{r}
+model_pgr <- lm(plant_growth_rate ~ soil_moisture_content, plant)
+autoplot(model_pgr, smooth.color = NA)
+```
+
+That was easy! Now let's interpret the resulting output. Briefly, the top left panel will tell you whether a line is an appropriate model to fit to the data - ideally, the points will be scattered evenly along the horizontal dotted line, with no obvious humps, valleys, or other curvature; the top right panel evaluates the assumption that the residuals (deviations of the data from the regression line) are normally distributed - if the points fall close to the diagonal dotted line, the assumption is probably reasonable; the bottom left panel evaluates the assumption that the residuals are equally variable along the regression line - there should be no pattern, such that the variation in the vertical direction should be similar across the entire range of fitted (predicted) values; finally, the bottom right panel evaluates leverage (specific data points that have a strong influence on the fit of the model) - in general, anything with a standardized residual value less that approximately +/- 2 is probably okay. Points with high leverage that also have a large standardized residual value (in the upper right or lower right corners of the plot) may be problematic - whether they are included in the analysis or not may strongly influence the results.
+
+Overall, these plots look fine. The key assumptions of linear regression analysis - data are linear, residuals are normally distributed and equally variable along the regression line, and no points have overly strong influence, all seem to be met. Don't worry about the message saying R removed row(s) containing missing values - that has to do with the argument smooth.color = NA that suppresses the addition of a trend line to the plots. You can ignore it...
+
+Now (finally!) we can have a look at the actual statistical output and interpret our results. We can do this using the **anova**() and **summary**() functions. Perhaps surprisingly, **anova**() in R does not in fact perform an analysis of variance (ANOVA); rather, the function returns a classic ANOVA table, which can be used to summarize the results of many different statistical tests, not just analysis of variance. The **summary**() function produces a table of the estimates of the coefficients of the regression line (the intercept and slope), and a measure of how well the model fits the data - the coefficient of determination, R-squared.
+
+Try that now; type:
+anova(model_pgr)
+summary(model_pgr)
+```{r}
+anova(model_pgr)
+summary(model_pgr)
+```
+
+Okay, so what does this tell us? 
+
+We'll start with the Analysis of Variance Table, which presents the degrees of freedom, sums of squares, mean squares (sums of squares divided by degrees of freedom; a variance), *F*-value (model mean square divided by the residual mean square; a ratio of two variances), and associated *P*-value. Remember from biostatistics that the *F* statistic is a ratio of the variance in the response data explained by the model (model variance) relative to the amount that is unexplained (typically called the residual or error variance). The null hypothesis (H0) is that the model explains none of the variance in the response; in which case, all of the variance is unexplained and the model and residual variances should be equal. If the null hypothesis were true, the expectation is therefore that *F* = 1. In this case, if there were no effect of soil moisture content on plant growth rate, the slope of the regression line relating the two variables would be zero - a horizontal line. That is the actual null hypothesis being evaluated.
+
+We can see that the *F*-value is actually quite large, suggesting that we would be unlikely to get that value just by chance. Consistent with this idea, the associated *P*-value is quite small. Specifically, given this size sample, we would expect to get an *F*-value equal to or greater than 156 less than one in a million times if the null hypothesis were true. It seems entirely reasonable to suggest that the evidence against the null is very strong and that it is more likely that the true slope of the relationship between soil moisture content on plant growth rate is in fact non-zero and positive.
+
+The estimates provided in the first column of the summary table correspond to the intercept and slope of the linear regression line associated with the explanatory variable. The intercept is the value of the response variable expected when the value of the explanatory variable is zero. The slope is the expected change in the response variable with each unit of change in the explanatory variable. The reported values suggest that when soil moisture content is zero, plant growth rate will be 19.35 mm/week; with each one-unit increase in soil moisture content, plant growth rate should increase by 12.75 mm/week. Those numbers are pretty close to what we estimated previously from the scatter plot of the data; the reported degrees of freedom also match our expectations. By making and evaluating the figure first, we have ensured that the statistics are confirmatory of our understanding of the patterns in the data. Combined with a formal assessment of the underlying model assumptions, this approach is much less prone to error than just going straight to the statistical results.
+
+The *t*- and *P*-values provide tests of whether the intercept and slope are different from zero. In this case, the evidence against the null hypothesis (that the true value of the population parameters they are estimating is zero) is quite strong for both. It may seem odd that we are testing whether the slope of the regression line is equal to zero twice - with an *F*-test and a *t*-test. However, the two approaches are mathematically equivalent: *t*^2 = *F*. You can check this: 12.49^2 = 156. Also, note that the reported *P*-values for the two tests are identical.
+
+Finally, the R-squared (R^2; coefficient of determination) value is a measure of the goodness-of-fit of the model to the data. Linear regression identifies the equation that produces the smallest difference between all of the observed values and their predicted or "fitted" values. In other words, it finds the line that produces the smallest sum of squared residuals that is possible for a given dataset. R-squared measures the strength of the relationship between your model and the data on a convenient 0 – 100% scale, **indicating the percentage of the variance in the response variable that is explained by the explanatory variable**. If all of the data fell perfectly along the fitted regression line, 100% of the variation in the response variable would be explained by the explanatory variable, and R-squared would equal 1. If there were no relationship at all between the two variables, the resulting horizontal line would produce an R-squared value close to zero, as none of the variation in the response variable would be explained by the explanatory variable.
+
+Essentially, R-squared evaluates the scatter of the data points around the fitted regression line. For a given data set, higher R-squared values represent smaller differences between the observed data and the fitted values. Note that the R-squared value does NOT tell you whether a given linear regression is statistically supported - that's what the *P*-value is for - and remember, the null hypothesis being tested is whether the slope of the fitted regression line is equal to zero. It is entirely possible (and even common in ecology) to find that a statistically-supported regression equation also has a low R-squared value. That would indicate that the independent variable explained some of the variation in the dependent response variable, but that a lot of variation remains unexplained. That particular result may be problematic if you want to use your regression model to make predictions, but the specifics will depend on the precision that you require and the amount of variation present in your data.
+
+R reports both multiple R-squared and adjusted R-squared. For simple linear regression with only one explanatory variable, the multiple R-squared value is fine (and will correspond to what it typically reported by other statistical analysis software programs). If you have multiple explanatory variables (so-called multiple regression), you would actually want to report the adjusted R-squared value. That seems counterintuitive, but the adjusted R-squared reports a modified version of multiple R-squared that has been "adjusted" for the number of variable in the model. We won't need to worry about that for now...
+
+So, in this example, the (Multiple) R-squared value is 0.7648, which means that almost 77% of the observed variation in plant growth rate is explained by variation in soil moisture content. That's quite a bit! We can see from the data that at any given soil moisture content, there are a range of reported plant growth rates, so obviously soil moisture content isn't the only factor that matters. Presumably, variation in things like light, nutrients, and/or grazing are responsible for the 13% or so of variation in plant growth rates that remains unexplained by our simple model.
+
+The final step in our workflow involves translating the model we have fitted back onto our figure of the raw data. Although for more complicated models we will need to do something different (e.g., see Chapters 6 and 7), for this simple linear regression it is quite easy; _**ggplot2**_ can do it directly.
+
+Type:
+ggplot(data = plant_gr, aes(x = soil_moisture_content, y = plant_growth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlab("Soil moisture content") +
+  ylab("Plant growth rate (mm/week))") +
+  theme_bw()
+```{r}
+ggplot(plant, aes(soil_moisture_content, plant_growth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlab("Soil moisture content") +
+  ylab("Plant growth rate (mm/week)") +
+  theme_classic()
+```
+
+Is that not awesome? The gray shading is the 95% confidence interval associated with the regression line.
+
+You can also modify the scaling, plot labels, line and point color, size, and transparency, and any number of other plot features before your export and save it to your Project folder. For example, you can specify limits and/or breaks on the axes with the **scale_x_continuous**() and **scale_y_continuous**() functions. Themes control non-data components of plots. You can use so-called "complete themes" that apply a consistent set of parameter values (e.g., **theme_bw**(), **theme_minimal**(), **theme_classic**(), etc.); alternatively, you can also tweak the display of an existing theme by modifying specific elements (e.g., "theme(panel.grid.minor = element_blank()" will remove the minor grid lines from the plot background). Finally, you can extend the regression line the full range of the *x*-axis, rather than limiting it to the range of the *x* data (although you should think carefully about whether to do this).
+
+Type:
+ggplot(data = plant_gr, aes(x = soil_moisture_content, y = plant_growth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm", fullrange = TRUE) +
+  scale_x_continuous(limits = c(0, 2),
+                     breaks = seq(from = 0, to = 2, by = 0.25)) +
+  scale_y_continuous(limits = c(10, 50)) +
+  xlab("Soil moisture content") +
+  ylab("Plant growth rate (mm/week)") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```{r}
+ggplot(plant, aes(soil_moisture_content, plant_growth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm", fullrange = TRUE) +
+  scale_x_continuous(limits = c(0, 2),
+                     breaks = seq(from = 0, to = 2, by = 0.25)) +
+  scale_y_continuous(limits = c(10, 50)) +
+  xlab("Soil moisture content") +
+  ylab("Plant growth rate (mm/week)") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```
+
+When reporting the results, we would probably say something like the following:
+
+> Soil moisture had a very strong positive effect on plant growth. For each increase in soil moisture, plant growth rate increased by 12.7 mm/week (*y* = 19.35 + 12.75*x*; *t* = 12.5, df = 48, *P* < 0.001, R^2 = 0.76).
+
+### Manatees and Powerboats
+West Indian Manatee (*Trichechus manatus*), commonly referred to as the Florida Manatee, are typically found in Florida and southeastern Georgia and feed primarily on sea grasses. They are protected by the Endangered Species Act (ESA), the U.S. Marine Mammal Protection Act (MMPA), and the Florida Manatee Sanctuary Act. These legislative initiatives grant the Florida Fish and Wildlife Conservation Commission (FWC) the authority to establish and enforce manatee protection zones across the state. A manatee protection zone is defined by the FWC as an area that restricts the speed and/or operation of vessels. There are 18 counties in Florida that have established manatee protection zones yet the leading anthropogenic cause of manatee death is water craft injury or “boat strikes” (Fig. 1).
+
+<center>
+![Fig. 1. Manatee with a number of healed boat strike scars.](manatee_scars.jpg)
+</center>
+
+Using Florida state records from 1977-2015, evaluate the following questions:
+
+* How have the number of powerboat registrations and manatee deaths due to boat strikes in Florida changed over time?
+
+* Is there any relationship between the annual number of manatee deaths and the number of powerboat registrations in a given year?
+
+As always, your workflow should be: *Plot* -> *Model* -> *Check Assumptions* -> *Interpret* -> *Plot Again*.
+
+1. Import the "manatees.csv" data into R, give it a short descriptive name (e.g., "manatees"), and view it as a tibble. Note that the annual number of powerboat registrations is reported in units of 1000.
+```{r}
+manatees <- read_csv("manatees.csv")
+manatees
+```
+
+2. Visualize the data with simple plots. Make two different line plots of the number of powerboat registrations and manatee deaths per year over time; assign each graph to the names "powerboats_plot" and "manatees_plot", respectively; and use the **grid.arrange**() function in _**gridExtra**_ to organize the two plots **side by side** into a single multi-panel figure. We'll try a different theme this time - theme_classic(), but don't worry about including additional formatting details at this time (e.g., axis labels or scaling).
+
+Type:
+powerboats_plot <- ggplot(data = manatees, aes(x = year, y = powerboats_x1000)) +
+  geom_line() +
+  theme_minimal()
+manatees_plot <- ggplot(data = manatees, aes(x = year, y = manatee_deaths)) +
+  geom_line() +
+  theme_minimal()
+grid.arrange(powerboats_plot, manatees_plot, nrow = 1)
+```{r}
+powerboats_plot <- ggplot(manatees, aes(year, powerboats_x1000)) +
+  geom_line() +
+  theme_minimal()
+manatees_plot <- ggplot(manatees, aes(year, manatee_deaths)) +
+  geom_line() +
+  theme_minimal()
+grid.arrange(powerboats_plot, manatees_plot, nrow = 1)
+```
+
+Well, that seems pretty clear! Since 1980, annual powerboat registrations in Florida have generally increased rapidly, with temporary dips coinciding with the short recession of 1990-1991 and the Great Recession starting in 2007. (Powerboats are likely to be the sort of luxury purchase that people may forego during an economic downturn.) Although noisier, annual manatee deaths due to boat strikes have generally tracked the changes in powerboat registrations, suggesting (not surprisingly) that the two variables are related.
+
+Let's evaluate that idea.
+
+3. Make a scatterplot of the relationship between manatee death and powerboat registrations. NOTE: think carefully about which is the explanatory and which is the response variable in this situation; as we will be fitting a linear function to describe the relationship between the two, the designation of *x*- and *y*-variables matters.
+```{r}
+ggplot(manatees, aes(powerboats_x1000, manatee_deaths)) +
+  geom_point() +
+  theme_classic()
+```
+
+4. Fit a linear regression model that assumes manatee deaths are a function of the number of powerboat registrations in a given year and evaluate the model assumptions - two steps.
+```{r}
+model_manatee <- lm(manatee_deaths ~ powerboats_x1000, manatees)
+autoplot(model_manatee, smooth.color = NA)
+```
+
+5. Assuming that a regression analysis is appropriate for these data (i.e., that the key assumptions are met), evaluate the regression test.
+```{r}
+anova(model_manatee)
+summary(model_manatee)
+```
+
+6. Using Fig. 2 below as a guide, make a publication quality plot of the annual number of manatee deaths versus powerboat registrations; export and save it to your Projects folder as a .png file (sized 5 in wide x 3 in high, with a resolution of 300 dpi) with **ggsave**().
+
+<center>
+![Fig. 2. Example scatterplot with regression line.](manatees_regression.png)
+
+```{r}
+library(ggpmisc) # used for stat_poly_eq function
+
+ggplot(manatees, aes(powerboats_x1000, manatee_deaths)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", fullrange = TRUE) +
+  scale_x_continuous(limits = c(447, 1027),
+                     breaks = seq(from = 400, to = 1100, by = 100)) +
+  scale_y_continuous(limits = c(0, 100)) +
+  xlab("Powerboat registrations (thousands)") +
+  ylab("Manatee deaths") +
+  theme_classic() +
+  ggtitle("Powerboat registration vs. manatee deaths in Florida from 1977-2015") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(panel.grid.minor = element_blank()) +
+  stat_poly_eq(formula = y ~ x,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE,
+               label.x = "right", label.y = "center") + # adds regression to plot
+  ggsave("manatees_fig.png", width = 5, height = 3, dpi = 300)
+```
+
+Well done!
+
+7. Use the results of your analyses above to answer the questions in the associated Quiz in BeachBoard.
+
+### Wrapping up
+Save your file and exit the R session.

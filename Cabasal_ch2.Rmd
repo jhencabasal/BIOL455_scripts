@@ -1,0 +1,220 @@
+---
+title: "Chapter 2 Getting Your Data Into R"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 2 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey. This content is also available as a Swirl course that can be downloaded from BeachBoard; the material covered is essentially the same, so you can decide which version you prefer.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "Your Last Name_ch2.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Define tidy data;
+
+* Prepare your data to import into R, including saving it as a .csv file;
+
+* Import your data into R using one of several possible methods;
+
+* Check that your data were correctly imported, and troubleshoot common problems if they were not;
+
+* List different functions in the _**dplyr**_ package that can be used to deal with messy data.
+
+### Load packages
+At the beginning of every Notebook or script, load the specific add-on packages you will need for that analysis into R.
+
+We will need the _**tidyverse**_ and _**lubridate**_ packages; in the code chunk below, type library(tidyverse), hit Enter and type library(lubridate), then hit Run:
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+### Tidy data
+>“Happy families are all alike; every unhappy family is unhappy in its own way.” –– Leo Tolstoy (author of [*Anna Karenina*](https://en.wikipedia.org/wiki/Anna_Karenina))
+
+>“Tidy datasets are all alike, but every messy dataset is messy in its own way.” –– [Hadley Wickham](http://hadley.nz/) (Chief Scientist at RStudio)
+
+As in much of life, careful preparation is the key to good results. R likes data in which there is one observation in a row, and each variable is represented by its own column. Such data is called "long format" or "tidy data". Getting your data into this format requires some upfront work, but that work pays off in the long term. Once you have tidy data and the tidy tools provided by packages in the tidyverse, you will spend much less time munging data from one representation to another, allowing you to spend more time on the analytic questions at hand.
+
+### Getting data ready for R
+Let's take a look at a sample data sheet in Excel (or some other spreadsheet software, e.g. [Google Docs](https://www.google.com/docs/about/) or [LibreOffice](https://www.libreoffice.org/)). Open the file called 'fiddler_crab_temps.xlsx' by clicking on the file name in the *Files* tab in the lower right pane, and then *View File*.
+
+These particular data are the body temperatures (*T*bs) selected by fiddler crabs in a laboratory thermal gradient; small and large crabs were tested on either wet or dry sand. For complete details of the study, see the associated publication: Allen et al. 2012 J Exp Mar Biol Ecol.pdf, also available in the file list. Note that the column names are informative, brief, and simple. In general, it is best not to use spaces or special symbols, which R can deal with but may not do so particularly well. Also, given categorical variables such as sex (male, female), it is best to use the actual category names rather than codes for them (e.g. don’t use 1 = male, 2 = female). R can easily deal with variables that contain words (so-called character strings), and this will make subsequent tasks in R much more efficient and reliable.
+
+All cells in a data sheet should have an entry, even if it is something saying "no observation was made". The expected placeholder for missing data in R is NA (e.g., see the third observation listed in the fiddler crab data set). Other options are possible, but not recommended - a blank cell is ambiguous: perhaps nothing was seen in that instance (in which case a zero should be used to indicate an actual null value), or perhaps no observation was made for whatever reason. 
+
+Although Excel has many features that make it convenient to organize and display data, most data scientists would argue that you should convert your .xls or .xlsx file to a "comma-separated values" (.csv) file before trying to import it into R. A .csv file is easily transported with a low memory and small size footprint among computing platforms. In Excel, or other spreadsheet programs, after you click *Save As* you can change the format of the file to "comma-separated values" (sometimes also called "comma delimited"), then press *Save*. Excel might then, or when you close the file, ask if you’re sure you’d like to save your data in this format. Yes, you are sure! Note that you can only save a single worksheet in a .csv file, so if you have your data organized as multiple worksheets in Excel, you will need to create a separate .csv file for each. You will also lose any formatting in the worksheets (e.g., bolding, centering, highlighting, etc.). Do that now - use *Save As* to save the fiddler crab data as "fiddler_crab_data.csv" in the same folder as the other files.
+
+One of the remarkable things about R is that once a copy of your "raw data" is established, the use of R for data visualization and analysis will never require you to alter the original file (unless you collect more data!). With R, your original data file can and must always remain unmanipulated; if any adjustments do occur, they occur in an R copy only and only via your explicit instructions harbored in the script.
+
+Ideally, your data will be tidy before you ever try to import them into R. If your data are not tidy to start with, you can of course rearrange them in Excel. This can, however, cause errors, be awfully time-consuming, and is tedious and boring for big datasets. The alternative is to do it in R; we'll practice that shortly.
+
+### Project-oriented workflow
+You should generally plan to organize each separate data analysis into a project: a folder on your computer that holds all the files relevant to that particular piece of work, starting with the .csv data file. Any associated R script should be written assuming that it will be run from a fresh R process/session, with the working directory (the location on your computer where R will look for files to open or save) set to the project directory (main folder). You can then create sub-folders for specific types of files, such as data, figures, function files, and manuscripts. Using a consistent folder structure and file naming system across projects makes it easier to navigate the project contents, resume work after a hiatus, and re-use code in multiple projects.
+
+Revisiting Jenny Bryan's post on [project-oriented workflow](https://www.tidyverse.org/articles/2017/12/workflow-vs-script/), this work style is so crucial that RStudio has an official notion of a [*Project*](https://support.rstudio.com/hc/en-us/articles/200526207-Using-Projects) (with a capital “P”). You can designate a new or existing folder as a Project. All this means is that RStudio leaves a file, e.g., foofy.Rproj, in the folder, which is used to store settings specific to that project. Double-click on a .Rproj file to open a fresh instance of RStudio, with the working directory and file browser pointed at the project folder. This convention guarantees that the project can be moved around on your computer or onto other computers and will still “just work”. RStudio fully supports Project-based workflows, making it easy to switch from one to another, have many projects open at once, re-launch recently used Projects, etc. You can create an RStudio project either in a brand new directory or an existing directory where you already have R code and data, by clicking *File*, and then *New Project* or the "Create a Project" button on the toolbar above. Although neither new, nor unique to R, this is arguably the only practical approach that creates reliable, polite behavior across different computers or users and over time. 
+
+All of which is to say that if you organize your R life around a project-oriented workflow, you can ignore all concerns about setting the working directory and specifying file paths. 
+
+### Getting your data into R
+In the next few sections, we will work with several datasets already in the project folder (also available for download as a zip file at the [companian website](http://r4all.org/books/datasets/) for the book). There are at least four really easy ways to get R to import the data, without having to do anything tricky like type the path to your data file; however, we are going to focus on just two:
+
+RStudio provides menu-based import functionality via the *Import Dataset* button on the Environment tab in the upper right pane of RStudio. This will allow you to navigate to your data file, select it, and click the *Open* button. Select "From Text (base)" as your option. A window will open with a list of all the files in this particular project folder choose fiddler_crab_temps.csv and click Open. A new dialogue box will displaying the first 20 rows of data and the default set of import options for the read.csv() function; note for the future that this import pathway relies on the **read.csv**() function, instead of the newer **read_csv**() function associated with the _**tidyverse**_ package. For this reason, we will not use it again - hit "Cancel."
+
+Instead, we will select "From Text (readr)". A new dialogue box will open; if you don't see the data file you want, click the *Browse* button, navigate to the file in the window that pops up, and click *Open*. You should then see the first 50 rows of data and the default set of import options for the **read_csv**() function from the _**readr**_ package (NOT the same as the **read.csv**() function above!). Note that you can use the Data Preview window by looking at the data type listed for each column: body size (character), sand (character), and *T*b (double). Double-precision floating-point format (double) is a computer number format for fractional or decimal values; (integer) is for integer values. If you try to import an Excel file with **read_csv**(), you will get an error message. You can, however, choose "From Excel" and it will work... however, particularly if you have missing data (e.g., NAs), odd things may happen during the import. Basically, stick to .csv files!
+
+Before you click the *Import* button, copy the associated line(s) of code in the *Code Preview* pane on the bottom right of the dialogue box. You've just told R to import the data stored in the fiddler_crab_temps.csv file, assign it to an object called fiddler_crab_temps, and show you resulting object in a new tab. Once you paste this code into your Notebook (or script), you don’t have to use the Import Dataset tool again; just run these lines of code and your data will be read in (assuming you don’t move the file, which you shouldn't if you are using a project folder). The beauty of this approach is that now your script is complete - each time you (or anyone else) runs your code, the correct data will be imported at the correct spot in the analysis. Nice!
+
+Try that now: copy and paste the code from the Code Preview pane into the chunk below and hit Run:
+```{r}
+library(readr)
+fiddler_crab_temps <- read_csv("fiddler_crab_temps.csv")
+View(fiddler_crab_temps)
+```
+
+But wait - you should know that while the *Import Dataset* button clearly worked, the associated import data code you just copied will not run unless you first load the add-on package _**readr**_. Remember that it is best to list all of the required packages for a given analysis at the beginning of your Notebook or script. You could move "library(readr)" to the first code chunk at top of this document, but as _**readr**_ is part of the _**tidyverse**_ package that we already loaded, doing so would be redundant.
+
+In the interest of having clean and efficient code, there are several additional things that you can do here: delete library(readr), name the object to which the data are assigned something simpler (e.g., crab_tbs), and replace View(fiddler_crab_temps) with crab_tbs:
+
+crab_tbs <- read_csv("fiddler_crab_temps.csv")
+crab_tbs
+
+Type that below and hit Run:
+```{r}
+crab_tbs <- read_csv("fiddler_crab_temps.csv")
+crab_tbs
+```
+
+As you can see, the data were imported and assigned to the object "crab_tbs" (you can also provide a name for the object to which the data will be assigned in the dialogue box) and you are able to preview it in the same window. This preview is called a "tibble" - part of the tidyverse. Tibbles show only the first 10 rows, and all the columns that fit on screen; this makes it much easier to work with large data. In addition to its name, each column reports its type (e.g., in this case, character sting <chr> or double <dbl>). In general, we will work with tibbles instead of R’s traditional data.frame. Tibbles *are* data frames, but they tweak some older behaviors to make life a little easier. Most of the time, you can use the terms tibble and data frame interchangeably.
+
+Alternatively, if you have your data and R Notebook or script in the same folder - as you would if you are using R Project - you can just click on the data file you want to import from the list in the Files tab of the lower left pane of RStudio (you may have to click the *Update* button to refresh the window). Although the book states that "you often don’t want your data in the same folder as your script;" many data scientists would suggest that is incorrect. In fact, I'm going to argue that storing all of the files in the same project folder is exactly what you want to do!
+
+### Checking that your data are your data
+Now that we are ready to move on, take a moment and import the compensation.csv data into R; paste the associated code in the chunk below (but not library(readr)) and modify it to produce a tibble:
+```{r}
+compensation <- read_csv("compensation.csv")
+View(compensation)
+```
+
+Once you have imported a data set, a very sensible next step is to make sure the data you got in R are actually the data you wanted. Some basic things to check are:
+
+* The correct number of rows are in R; 
+
+* The correct names and number of variables are in R;
+
+* The variable are of the correct type (e.g. R recognizes numeric variables to be numeric); 
+
+* Variables describing types of things (e.g. sex) have the correct number of categories (levels).
+
+At this point, the book introduces several functions you can use to investigate your data: **names**() tells you the names assigned each column; **head**() returns the first six rows of the dataset (guess what **tail**() does?); and **dim**() tells you the numbers of rows and columns - the *dimension* - of the dataset. Perhaps the most useful function is **str**(), which returns the structure of the dataset, combining nearly all of the previous functions into one.
+
+Type str(compensation) and hit Run: 
+```{r}
+str(compensation)
+```
+
+This output looks a little different than what is shown in the book - this is because the data assigned to "compensation" are structured somewhat differently. Specifically, the grazing category in the book example is classified as factor, whereas it is a character string in the output above. Until recently, base R handled data import a bit differently than it does now... We'll explore the implications of these differences later.
+
+One potentially useful feature of **str**() is that the column names are color-coded by data type; this makes it easier to spot when a column differs from the rest or when guessing by R leads to import with an unexpected type. Otherwise, all of this information is already available in the tibble above. The **glimpse**() and **as_tibble**() (formerly **tbl_df**()) functions in _**dplyr**_ are also now redundant: **glimpse**() provides a horizontal view of the data, whereas **as_tibble**() provides - wait for it - a tibble.
+
+### Basic troubleshooting while importing data
+At this point you know how to create a .csv file, import the associated data, and make sure you got the data in R that you wanted, using several functions. These tasks are the basic first steps in any process of quantitative problem solving, and they are the foundation. They are not optional steps. Forget these, get these wrong, and everything else will be wrong also. So focus on having rock-solid data in R. Of course, along the way, bad things will happen. The book presents several examples of different kinds of problems you might encounter; have a look at them.
+
+### Advanced activity: dealing with untidy data
+As was implied above, there are lots of ways data can be untidy and it’s not possible to deal with them all now. Nevertheless, here is a somewhat typical example in which observations of the same thing  (bacterial density) have been recorded on multiple dates, and the observation from each date placed in a separate column. Rows of the data correspond to experimental units (defined here by the protist species consuming the bacteria, and the environmental temperature) (another variable, Bottle, is a unique identifier for the experimental unit).
+
+Let’s import the data (located in a file called "nasty_format.csv"), check them, and then tidy them:
+```{r}
+nasty_format <- read_csv("nasty_format.csv")
+View(nasty_format)
+```
+
+The tibble above has 37 observations and 11 variables, but the experiment involved only 36 experimental units. Looking at the data on the fourth page of the tibble, or by clicking on the nasty_format text in the Rstudio Environment pane and scrolling down in the displayed data, shows there is a 37th row containing no data. This is a particular error usually caused by something odd that was done in Excel. Let’s remove that row; start by identifying what is unique about it, compared with all the other rows. Importantly, it lacks an entry in the Bottle variable. So we tell R to keep only rows that have an entry in the Bottle variable, using the **filter**() function in the _**dplyr**_ package (more about this add-on package, and **filter**(), in the next chapter):
+
+Start by asking R for help with **filter**() by typing ?filter() and hitting Run:
+```{r}
+?filter()
+```
+
+Surprise! As you can see in the Help tab in the lower left pane, there are two different functions called **filter**() - one in the _**dplyr**_ package and another in the _**stats**_ package. Luckily, we know that we are using _**dplyr**_ (and that we haven't even loaded _**stats**_), so it's easy enough to figure out which link to click for more information. The two main arguments are .data (the tibble you want to filter) and ... (logical predicates; i.e., how you want R to filter the data). The help file also provides a list of logical operators: ! indicates logical negation (NOT).
+
+Type nasty_format <- filter(nasty_format, Bottle != ""), hit Enter and type nasty_format (to view the resulting tibble), then hit Run:
+```{r}
+nasty_format <- filter(nasty_format, Bottle  != "")
+nasty_format
+```
+
+Problem solved! Now we make the data tidy. We need a new variable that contains the date on which observations were made, and a new variable containing the observations of bacterial abundance that are currently stored in columns 4 to 11. And then we need to move the data into these new columns. This is all very straightforward, thanks to the **gather**() function in the _**tidyr**_ package. **pivot_longer**() and **pivot_wider**() have recently replaced the older **spread**() and **gather**() functions in _**tidyr**_, so we may eventually need to figure out how they differ, but don't worry about it for now. Keeping on top of the continued updates and improvements to packages in R is one of the more difficult challenges to working with this platform...
+
+Type tidy_format <- gather(data = nasty_format, Date, Abundance, 4:11), hit Enter and type tidy_format, then hit Run:
+```{r}
+tidy_format <- gather(data = nasty_format, Date, Abundance, 4:11)
+tidy_format
+```
+
+The first argument of gather is the data frame to work on: nasty_format. The second is the name of the new variable that will contain the dates (we call it Date). The third is the name of the new variable that will contain the bacterial abundances (we call it Abundance). The fourth argument is the location in the nasty_format data frame of the observations of bacterial abundance that are to be put into the new Abundance variable. Examine the tibble above and/or use str(tidy_format) below to see if it worked:
+```{r}
+str(tidy_format)
+```
+
+Yes, super! We have 288 observations (36 experimental units (bottles), each observed on eight dates). We have the new Date variable, a character string-type variable with eight levels (NOT factor-type, as the book suggests - remember the recent recent change in how R imports data), and the new Abundance variable, which is double precision numbers.
+
+The data are now officially tidy. The Date variable still needs a bit of work, however. We need to make R recognize that these are dates (i.e. change the variable type from a character-type to a date-type variable). We do this with the **mutate**() function of the _**dplyr**_ add-on package, which provides a neat way of changing (or adding) variables in a data frame (much more about this in the next chapter). Technically, we are going to parse the information in the date variable so that R regards it as a date. This will allow us to use the Date variable as a continuous variable, for example to make a graph with the date on the x-axis, or even to calculate the number of days, months, or years between two or more dates.
+
+We will use a function in the _**lubridate**_ package that we loaded in the first code chunk above. This package contains the functions **ymd**(), **ydm**(), **dym**(), **dmy**(), **myd**(), and **mdy**(), among others. Which of these functions should we use for our data?
+
+Take a look at the date values by typing unique(tidy_format$Date) and hitting Run:
+```{r}
+unique(tidy_format$Date)
+```
+
+We’ve used a bit of classic R here, the dollar sign, to refer to a variable inside a data frame. Not too much sleuthing shows that our date has the format day.month.year. So we use the function **dmy**(). This is a quite intelligent function, able to deal with, e.g., different separators (ours is a dot but others work) and dates that include leading zeros. 
+
+Parse the Date data into the appropriate format (day.month.year); type tidy_format <- mutate(tidy_format, Date = dmy(Date)), hit Enter and type tidy_format, then hit Run:
+```{r}
+tidy_format <- mutate(tidy_format, Date = dmy(Date))
+tidy_format
+```
+
+Date is now a date-type variable, as it should be. So what can we do now, with this tidy data? Well, imagine we want to view the dynamics of bacterial abundance in each bottle. We can now do this with very little code. _**ggplot2**_ is a powerful and flexible plotting package available as part of the _**tidyverse**_ package. We will explore **ggplot**() in more detail in Chapter 4, but for now we will tell **ggplot**() the data frame to look in for variables, the *x*- and *y*-variables, to plot points, and to then produce a separate graph (i.e. facet) for each of the bottles.
+
+Type:
+
+ggplot(data = tidy_format, aes(x=Date, y=Abundance)) +
+  geom_point() +
+  facet_wrap(~Bottle)
+  
+and then hit Run:
+```{r}
+ggplot(data = tidy_format, aes(x=Date, y=Abundance)) +
+  geom_point() +
+  facet_wrap(~Bottle) +
+theme(axis.text.x = element_text(angle=90)) #rotates x-axis labels, as mentioned on Beachboard
+```
+
+Separating each component of the graph building process onto its own line of code makes it easier to see what functions have been called, to modify any of the associated arguments, and to add new functions. It can also help with coding errors, as you will see exactly where any problem occurs. The resulting panel of graphs has correct dates on the *x*-axis, and is really useful for data exploration, or even publication after some polishing (e.g. making the *x*-axis tick labels legible). A panel of graphs like this would have been considerably more hassle to make if the data were not tidy, i.e. if the data were left as they were in the data file, with one variable for each date.
+
+### Functions for dealing with messy data  
+As was mentioned already, there are many ways in which data can be untidy and messy. Fortunately, there are lots of nice functions for dealing with such data. In the _**base**_, _**tidyr**_, and _**dplyr**_ packages there are (in addition to the ones we've already seen):
+
+* **spread**(): does the opposite of gather. Useful for preparing data for multivariate methods;
+
+* **separate**(): separates information present in one column into multiple new columns;
+
+* **unite**(): puts information from several columns into one column;
+
+* **rename**(): renames the columns of your data;
+
+* **rbind**(): puts two datasets with exactly the same columns together (i.e. it binds rows together);
+
+* **cbind**(): puts two datasets with exactly the same rows together (i.e. it binds columns together, but it is often better to use the next function);
+
+* **join**(): a suite of functions, such as **full_join**(), which allows joining together two datasets with one or more columns in common. (Same as the **merge**() function in the _**base**_ package.)
+
+You will probably find that tidying data, especially data that you didn’t prepare, can take a lot of time and effort. However, it’s an investment well made, as having tidy and clean data makes everything following ten times easier. We’ve used functions from several add-on packages: _**tidyr**_, _**lubridate**_, _**dplyr**_, and _**ggplot2**_. It would be well worth your while to review these, and make notes about which functions we used from each of these packages, why we used them, and the associated arguments.
+
+### Wrapping up
+Save your file and exit the R session.

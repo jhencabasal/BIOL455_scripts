@@ -1,0 +1,414 @@
+---
+title: "Chapter 3 Data Management, Manipulation, and Exploration with *dplyr*"
+author: Jhen Cabasal
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file that follows (with some modifications) the text of Chapter 3 of [*Getting started with R: an introduction for biologists, 2nd edition*](http://r4all.org/) by Andrew P. Beckerman, Dylan Z. Childs, and Owen L. Petchey.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "Your Last Name_ch3.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Calculate summary statistics for a dataset;
+
+* Subset data using the **slice**(), **select**(), and **filter**() functions in the _**dplyr**_ package;
+
+* Transform data using the **mutate**() function in the _**dplyr**_ package;
+
+* Sort data using the **arrange**() function in the _**dplyr**_ package;
+
+* Translate a two-function code into 'piped' commands using the _**magrittr**_ package.
+
+### Introduction
+Exploring, manipulating, and graphing your data are fundamental parts of data analysis. Your workflow should always start with visualizing your data - before you ever do any statistics. Statistical analysis is a tool for evaluating whether particular patterns you may see in your data are likely to represent real phenomena (e.g., the number of times some event occurs is different than expected, the average response in one group is different than in another group, the value of one variable changes consistently in concert with another variable, etc.); however, the primary question should always be: what do the data show?
+
+There are two fundamental toolsets for this initial effort: manipulation tools and graphing tools. In this lesson, you will use the _**dplyr**_ package to do various common data manipulations in R. This is extremely important learning, as we almost always need to do some data manipulation, such as subsetting or calculation of mean ± SE. Your eventual goal should be to have your entire workflow contained, as much as possible, in one place: your R Notebook, Markdown document, or script.
+
+### Load packages
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis.
+
+We will need the _**tidyverse**_ and _**lubridate**_ packages; in the code chunk below, type library(tidyverse), hit Enter and type library(lubridate), then hit Run:
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+We’ll be working with the compensation data we used in the last chapter, so go ahead and import that now in the code chunk below and then visualize it as a tibble. Type:
+
+compensation <- read_csv("compensation.csv")
+compensation
+
+then hit Run:
+```{r}
+compensation <- read_csv("compensation.csv")
+compensation
+```
+
+Just so you have a frame of reference going forward, the compensation data are about the production of fruit (apples, kg) on rootstocks of different widths (mm; the tops are grafted onto rootstocks). Data in these two columns are numbers: <dbl> = double floating point number. Some trees are in parts of the orchard that allow grazing by cattle, and others are in parts free from grazing. Grazing may reduce the amount of grass, which might compete with the apple trees for resources. Data in this column are words: <chr> = character string.
+
+### Summary statistics for each variable
+Although a tibble provides quite a bit of information about the structure of your data, it doesn't give much information about the particular values in each variable, or summary statistics of these. To get this information, use the **summary**() function in base R.
+
+Try it! Run summary(compensation) in the code chunk below:
+```{r}
+summary(compensation)
+```
+
+The **summary**() function should give us the median, mean, interquartile range, minimum, and maximum for all numeric variables, and the names and sample sizes for levels of all categorical factors. It’s worth looking carefully at these summary statistics. They can tell you if there are unexpectedly extreme, implausible, or even impossible values - a good first pass at your data.
+
+In this case, **summary**() does not appear to behave as expected: instead of reporting two levels of the "Grazing" variable (*Grazed* and *Ungrazed*, both with 20 observations), we instead get the information that the column is of length 40 and mode 'character.' In other words, R does not recognize Grazing as a factor. If we want R to do so, we need to tell it that explicitly...
+
+Remember from the last chapter that in R, the dollar sign ($) is used to reference a specific column in a given data frame. To tell R to look for the Grazing column in the compensation data frame, we can type:
+
+compensation$Grazing
+
+and R will return all of the values in that column. Try it now:
+```{r}
+compensation$Grazing
+```
+
+It worked! Now that we know we can specify a column in R, we can also tell R to change how it treats the data in that column. The function **as_factor**() in _**forcats**_ (included in the _**tidyverse**_ package) coerces its argument to a factor. Type:
+
+compensation$Grazing <- as_factor(compensation$Grazing)
+compensation
+
+and hit Run in the code chunk below. Note that R Markdown interprets two dollar signs in the same line of code to indicate a mathematical formula - if you hover your cursor over the bit between the two dollar signs in the code above, you can see the 'formula.' At any rate, it doesn't do that inside code chunks, so just ignore it for the moment:
+```{r}
+compensation$Grazing <- as_factor(compensation$Grazing)
+compensation
+```
+
+Looking at the resulting tibble, we can see that Grazing is now considered to be a factor <fct> by R, just as we wanted.
+
+Let's try the **summary**() function again:
+```{r}
+summary(compensation)
+```
+
+Better! We are now going to explore five ‘verbs’ that are also functions in _**dplyr**_ - a package focused on manipulating data. The verbs are **select**(), **slice**(), **filter**(), **mutate**(), and **arrange**():
+
+* **select**() is for selecting columns;
+
+* **slice**() is for selecting rows;
+
+* **filter**() is for selecting subsets of rows, conditional upon values in a column;
+
+* **mutate**() is for creating new variables in the data frame;
+
+* **arrange**() is for sorting rows.
+
+These are core functions for activities centered on grabbing pieces of (subsetting) data (e.g., **select**(), **slice**(), and **filter**()), sorting data (e.g., **arrange**()), or transforming variables (e.g., **mutate**()). Of course, there are more - check the Cheatsheet in the RStudio Help menu to see some of them.
+
+The key to using _**dplyr**_ is to remember that the first argument to ALL _**dplyr**_ functions is the data frame.
+
+### Subsetting
+**select**() grabs columns. Of course, it helps to know the name of the columns, so if you need to, check the tibble first. Let's try using this function to get the Fruit column from the compensation data set: the first argument is the data frame, whereas the second is the column we want to select.
+
+Run select(compensation, Fruit):
+```{r}
+select(compensation, Fruit)
+```
+
+You may have noticed that **select**(), as a _**dplyr**_ verb, uses a data frame and returns a data frame (remember that a tibble is a special kind of data frame). If you look at the top of the output, you will see the column name ‘Fruit’. You have asked for part of a data frame, and you get one back - in this case a one-column data frame. Not all R functions act like this.
+
+**select**() seems to do one thing only. This is totally true. All _**dplyr**_ functions do one thing only, but they do that one thing very fast and very effectively. **select**() can also be used to select all columns except one. For example, if we wanted to leave out the Root column, leaving only the Fruit and Grazing columns, we would type select(compensation, -Root). You try:
+```{r}
+select(compensation, -Root)
+```
+
+Yep, that worked too. 
+
+**slice**() grabs rows. It works by returning specific row numbers you ask for. You can ask for one row, a sequence, or a discontinuous set. For example, to get the second row, we would type slice(compensation, 2):
+```{r}
+slice(compensation, 2)
+```
+
+If we want the second to the tenth row, we can invoke the ":" to generate the sequence.
+
+Confirm that for yourself with slice(compensation, 2:10):
+```{r}
+slice(compensation, 2:10)
+```
+
+And discontinuous sets are easy, but we need to collect the row numbers using another helper function in R called *c*(). 'c' is short for 'concatenate' (paste together).
+
+Run slice(compensation, c(2, 3, 10)):
+```{r}
+slice(compensation, c(2, 3, 10))
+```
+
+One thing to know about **slice**() is that, like **select**(), it also returns a data frame. However, it does not return the row number identity found in the original data (2, 3, and 10). You have instead new, continuous row numbers (1, 2, and 3). Just be aware of this behavior.
+
+**filter**() is super-powerful subsetting. It requires some basic knowledge of logical and boolean operators in R. Let’s first work through those, and then learn how to apply them. R has a complete set of operators. Table 3.1 in the book provides some insight into common ones, with examples of their use in **filter**(). Have a look at it now; we can wait...
+
+One of the tricks you can use to understand how this works can be seen in the next few snippets of code. Let’s see how R interprets '>' first.
+
+Type: with(compensation, Fruit > 80) in the code chunk below, and hit Run:
+```{r}
+with(compensation, Fruit > 80)
+```
+
+First, **with**() is a handy function … it says to R, "look in this data frame, and do what comes next, and then stop looking". Second, you will notice that the > symbol, a logical, on its own produces a sequence of TRUE and FALSE, identifying where in the Fruit vector it is TRUE that the value of Fruit is > 80. This is handy. Other R functions can use this set of TRUE and FALSE values to retrieve or omit data. This set of TRUE and FALSE values is the information passed to **filter**(); this is what **filter**() can act on and return to you. Pretty okay!
+
+Let’s imagine we are interested in all of the trees producing a large amount of fruit. We see from the **summary**() output above that big fruit production means > 80 kg (the 3rd quartile is 76.19 kg). As with all _**dplyr**_ functions, we first supply the data frame and then the condition by which we judge whether to return rows.
+
+Run filter(compensation, Fruit > 80):
+```{r}
+filter(compensation, Fruit > 80)
+```
+
+That action returned nine rows of data. We can just as easily select rows according to multiple conditions. For example, to keep only rows with Fruit > 80 OR less than 20, we employ the boolean *or* symbol "|" (the vertical bar symbol, not an upper-case i or lower-case L).
+
+Run filter(compensation, Fruit > 80 | Fruit < 20):
+```{r}
+filter(compensation, Fruit > 80 | Fruit < 20)
+```
+
+That action returned 13 rows of data, so we've grabbed four additional rows. It shouldn't therefore surprise you to see that there are now four values for Fruit that are less than 20. At the moment, you’ve been asking R to do stuff, and report back the outcome of doing it in tibbles. However, very often, you will want to use the results in subsequent analyses. As you will recall from the previous chapters, the assignment operator (<-) is what you need to use. If we want to save the data from low and high Fruit-producing trees for some other activity, we will have to assign the result to an object: let's call it hi_lo_fruit:
+
+Type hi_lo_fruit <- filter(compensation, Fruit > 80 | Fruit < 20), hit Enter and then type hi_lo_fruit, and then hit Run:
+```{r}
+hi_lo_fruit <- filter(compensation, Fruit > 80 | Fruit < 20)
+hi_lo_fruit
+```
+
+Commit this to memory: **assign the values returned by subsetting using filter to an object if you want to use them again!**
+
+### Transforming
+Transforming columns of your data is a common practice in many biological fields. For example, it is common to log-transform variables for graphing and data analysis. You may also find yourself in a situation where you want to present or analyze a variable that is function of other variables in your data. For example, if you have data on the total number of observations and on the number that were blue, you might want to present the proportion of observations that were blue. You can use the **mutate**() function to achieve these ends. 
+
+As with all _**dplyr**_ functions... **mutate**() starts with the data frame in which the variables reside, and then designates a new column name and the transformation. For example, let’s log-transform Fruit, and call it logFruit. We will make this new column appear in our working data frame by employing a neat trick, assigning the values returned by **mutate**() to an object of the same name as the original data. We are essentially overwriting the data frame, but now with an additional column that holds the log-transformed values! 
+
+Run compensation <- mutate(compensation, logFruit = log(Fruit)) and then look at the resulting tibble:
+```{r}
+compensation <- mutate(compensation, logFruit = log(Fruit))
+```
+
+Cool! Just to drive home a very nice point about working with R and a Notebook file or script, ask yourself whether you’ve changed anything in your safe, backed-up, securely stored .csv file on your computer. Have you? Nope. We are working with a copy of the data inside R, manipulating these data, but at no time are we altering the original raw data. You can always go back to those if you need.
+
+### Sorting
+Sometimes it’s important or desirable to put the observations (rows) of our data in a particular order, i.e., to sort them. It may simply be that you’d like to look at the dataset, and prefer a particular ordering of rows. For example, we might want to see the compensation data in order of increasing Fruit production. If so, we can do that with the **arrange**() function:
+
+Run arrange(compensation, Fruit):
+```{r}
+arrange(compensation, Fruit)
+```
+
+Another reason for arranging rows in increasing order is if we’d like to perform analyses that need a specific order. For example, some types of time series analyses need the data in the correct temporal order (and may not themselves ensure this). In this case, we would be very well advised to do the sorting ourselves, and check it carefully.
+
+If you prefer descending order instead, use **desc**() as one of the arguments in **arrange**(). For example, type arrange(compensation, desc(Fruit)), and hit Run:
+```{r}
+arrange(compensation, desc(Fruit))
+```
+
+Alternatively, you can accomplish the same thing with arrange(compensation, -Fruit), which is even simpler:
+```{r}
+arrange(compensation, -Fruit)
+```
+
+You can look at the help file for **arrange**() to see how to sort by multiple variables.
+
+### Mini-summary and two top tips
+So, that was a rapid introduction to five key verbs from _**dplyr**_. _**dplyr**_ functions are fast and consistent, with each doing one thing very well. On this latter note, here is *Top Tip 1*: you can use more than one _**dplyr**_ function in a single line of code! Imagine you want fruit production > 80, and the rootstock widths ONLY. That calls for the use of both **filter**() and **select**():
+
+Run select(filter(compensation, Fruit > 80), Root):
+```{r}
+select(filter(compensation, Fruit > 80), Root)
+```
+
+Note that R will perform the functions from the inside out - in this case, it filtered the compensation data set for all rows where Fruit > 80 kg, then selected only the Root column from that subset of the original data. If you tried to do it the other way around, selecting first and then filtering, it wouldn't work. Once the Root column was selected, there would be no Fruit data left upon which to filter. Does that make sense?
+
+Try it - type filter(select(compensation, Root), Fruit > 80):
+```{r}
+filter(select(compensation, Root), Fruit > 80)
+```
+
+Told you. 
+
+This leads us to *Top Tip 2*. Built into _**dplyr**_ is a very special kind of magic, provided by Stefan Milton Bache and Hadley Wickham in the _**magrittr**_ package. This gets installed when you install _**dplyr**_, so you don’t need to get it yourself. The magic is found in a symbol called a *pipe*. In R, the pipe command is %>%. You can read this like "put the answer of the left-hand command into the function on the right". This is genius!
+
+Let’s translate the two-function code above into "piped" commands. The art of piping with _**dplyr**_ is to remember to always start with the data frame...
+
+Type:
+
+compensation %>%
+  filter(Fruit > 80) %>%
+  select (Root)
+
+and then hit Run:
+```{r}
+compensation %>% 
+  filter(Fruit > 80) %>% 
+  select(Root)
+```
+
+Read from left to right, top to bottom, this says (1) work with the compensation data, (2) **filter**() it based on the fruit column, getting all rows where it is TRUE that Fruit > 80, and then pass this data frame to (3) **select**() and return only the Root column as the final data frame. Sweet. It is nicer and much easier to read than putting functions inside functions, which gets even more valuable when more than two functions can potentially be used inside each other (just wait!).
+
+### Calculating summary statistics about groups of your data
+In the compensation data frame we have a categorical variable, Grazing. It has two levels, Grazed and Ungrazed. This structure to the data means we might be able to calculate the mean fruit production in each category. Whenever you have structure, or groups, you can generate with R some rather amazing and fast summary information. The two key _**dplyr**_ functions for this are **group_by**() and **summarize**(). We also introduce the functions **mean**() and **sd**() (standard deviation). 
+
+Summarization is accomplished in a series of steps. The core idea, using _**dplyr**_, is to:
+
+1. Declare the data frame and what the grouping variable is;
+
+2. Provide some kind of maths function with which to summarize the data (e.g. **mean**() or **sd**());
+
+3. Provide a nice name for the values returned;
+
+4. Make R use all this information.
+
+Here are two methods for making this happen.
+
+In the nested approach, we construct everything as follows. A good test of knowing your data is asking what you might expect. Here, using one grouping variable with two levels and asking for the means, we expect a data frame to be returned with two numbers, a mean for *Grazed* and a mean for *Ungrazed* Fruit production:
+
+Type summarize(group_by(compensation, Grazing), meanFruit = mean(Fruit)), and hit Run:
+```{r}
+summarize(group_by(compensation, Grazing), meanFruit = mean(Fruit))
+```
+
+The second line of code has some good stuff on the "inside". The **group_by**() function works with the data frame and declares Grazing as our grouping variable. Of course, if we have more than one grouping variable, we can add them with commas in between. It’s that easy. The third line is where we ask for the mean to be calculated for the Fruit column. We can do this, and R knows where to look, because the group_by() function has set it all up. The "word" meanFruit is some formatting for the output, as you can see above. We get the mean of each of the Grazing treatments, just as expected. Don’t forget, if you want to use the means, you must use the <- symbol and assign the result to a new object.
+
+Perhaps call it mean.fruit:
+```{r}
+mean.Fruit <- summarize(group_by(compensation, Grazing), meanFruit = mean(Fruit))
+```
+
+An alternative approach is the piping method, which is perhaps more logical in flow. As above, we always start by declaring the data frame. One big difference is that summarize() is now third in the list, rather than on the "outside". Start with the data, divide it into groups, and calculate the mean of the fruit data in each group. 
+
+That’s the order: compensation %>% group_by(Grazing) %>% summarize(meanFruit = mean(Fruit)):
+```{r}
+compensation %>% 
+  group_by(Grazing) %>% 
+  summarize(meanFruit = mean(Fruit))
+```
+
+**group_by**() and **summarize**() are super useful functions. You can **group_by**() whichever categorical variables you have, and calculate whatever summary statistics you like, including **mean**(), **sd**(), **median**(), and even functions that you make yourself e.g., the standard error of the mean (se) = **sd**()/**sqrt**(**n**()). In fact, with very few changes to the above code, you can ask for more than one statistic or metric:
+```{r}
+compensation %>% 
+  group_by(Grazing) %>% 
+  summarize(medianFruit = median(Fruit), sdRoot = sd(Root))
+```
+
+This makes creating fast and efficient summaries of your data over many dimensions incredibly easy to do.
+
+### What have you learned - lots
+From Chapter 1 to now, you’ve gained a great deal of understanding of how R does maths, works with objects, and can make your life easy and very organized by allowing you to work in a Notebook file or script. You’ve learned about tidy data and, importantly, how to import data into R and now know to explore those data. You’ve gained new skills via _**dplyr**_, letting you work with columns, rows, and subsets of your data. Not to mention creating new transformations of your data, and rearranging them. Oh, and that magical pipe. Furthermore, you’ve calculated some basic statistics, and in doing so learned several new tricks about working with groups of your data.
+
+Most importantly, from an R data analysis/data management perspective, you have a *permanent*, *repeatable*, *annotated*, *shareable*, *cross-platform*, and *executable* record of what you are doing.
+
+### Okay, now it's your turn
+Let's practice putting together some of the functions you just learned to actually do something interesting. We're going to be working with a data set of growth rates of four species of limpet exposed to low, natural, or high levels of temperature variability in the rocky intertidal zone at Hopkins Marine Station (HMS) in Pacific Grove, CA (Fig. 1). Limpets were photographed every month from Jan-Apr and Jul-Dec, 2013; growth was calculated from the change in shell area over time.
+
+<center>
+![Fig. 1. Experimental plates with and without limpets in the rocky intertidal zone at HMS.](HMS_plates.jpg)
+</center>
+
+We would like to know whether average monthly growth rate differed among limpet species in the study. We'll ignore any effects of temperature for now, by just looking at growth in the 'natural' temperature variation treatment. Since growth rates are likely to be non-normally distributed, we'll also want to log-transform them before calculating means and standard errors for growth rate of each species.
+
+Import the limpet_growth.csv file and then visualize it as a tibble:
+```{r}
+limpet_growth <- read_csv("limpet_growth.csv")
+limpet_growth
+```
+
+Looks good! Before we do anything else, are the data tidy? Why or why not?
+
+Well, it looks there are four different columns of growth data - one for each species of limpet. In other words, there are more than one observation in a given row. Remember that tidy data have only a single observation per row, so NO, the data are not yet tidy. That's a problem, given that we want to compare species to each other. Also, the date column is currently listed as character-type, but that's not right either.
+
+Let's make a list of the steps we need to accomplish in order to answer our research question:
+
+1. Create a new variable called "species" that contains the species names, and another called "growth" containing the monthly growth rates that are currently stored in columns 4 to 7; then move the data into the new columns.
+
+2. Filter the data to just include data in the "natural" temperature variation treatment group;
+
+3. Transform the growth data into a new column called "log_growth";
+
+4. Summarize the log-transformed data by species with respect to mean and standard deviation.
+
+That seems doable...
+
+We'll take things one step at a time:
+
+1. Create a new variable called "species" that contains the species names, and another called "growth" containing the monthly growth rates that are currently stored in columns 4 to 7; then move the data into the new columns. We can do this with the **gather**() function in _**tidyr**_ (included in the _**tidyverse**_ package). (Note that we learned about **gather**() in the last chapter, so you may need to go back and review that function first...).
+```{r}
+limpet_growth <- gather(limpet_growth, species, growth, 4:7)
+limpet_growth
+```
+
+2. Filter the data to just include those in the "natural" temperature variation treatment group; i.e., rows where temperature treatment equals "natural". We can do this with the **filter**() function in _**dplyr**_ (remember R needs logical or boolean operators to do this, so check Table 3.1 in the book to make sure you are using the correct one).
+```{r}
+limpet_growth <- filter(limpet_growth, temp_trt == "natural")
+limpet_growth
+```
+
+Did that work? Check the number of rows to see... Nice! (There should be 1/3 the number of rows that were in the original data set, given that we were trying to grab data for only one of the three temperature treatments.) Doing these sorts of quick and easy quality assurance checks is a habit you should work to develop.
+
+3. Now transform (mutate) the growth data into a new column called "log_growth". We can do this with the **mutate**() function in _**dplyr**_:
+```{r}
+limpet_growth <- mutate(limpet_growth, log_growth = log(growth))
+limpet_growth
+```
+
+Three for three!
+
+4. Group the log-transformed data by species and summarize the grouped data by mean and standard deviation (sd). We can do this with the **group_by**() and **summarize**() functions in _**dplyr**_, using pipes (%>%) to connect the two functions. Don't forget to always start by declaring the data frame - in this case, limpet_growth.
+```{r}
+limpet_growth %>% 
+  group_by(species) %>% 
+  summarize(mean = mean(log_growth), sd = sd(log_growth))
+```
+
+Hmm, what happened here? Why does pelta have "NaN" listed instead of numbers? What does that even mean? Use the help function and look it up...
+
+Okay, so it appears as though NaN stands for "Not a Number"; figured that out already, thanks. But why did R return that result? Let's scroll through the "pelta" data in the tibble above and see what we see.
+
+Got it! Row 30 (NOT 37, that's the triplet number that identifies which set of experimental plates that growth number is associated with) has a negative number for growth, and therefore NaN for log_growth, given that the log of a negative number is undefined. Basically, R can't calculate a mean or a variance for that group unless we get rid of that row. We can't know for sure what happened here - it's unlikely that the limpet actually got smaller since these data are based on changes in shell size, so this probably represents either a minor measurement error or a keyboard mistake made during data entry.
+
+At any rate, for now let's try dropping the the problematic row (row 30) and then looking at the tibble to make sure we did it correctly. We can do this with the **slice**() function in _**dplyr**_.
+```{r}
+limpet_growth <- limpet_growth %>% 
+  slice(1:29, 31:40)
+limpet_growth
+```
+
+Since that worked (there are now only 39 rows, instead of 40), let's re-run the code from two chunks above:
+```{r}
+limpet_growth %>% 
+  group_by(species) %>% 
+  summarize(mean = mean(log_growth), sd = sd(log_growth))
+```
+
+Awesome! To bring it all together, copy all of the different code chunks above (starting with importing the limpet_growth.csv file) into a single block of code below that will do each of the different steps in order. You will likely want to make use of pipes (%>%) to connect different lines of code; you'll need to delete any redundant code so that the instructions flow smoothly from one to the next. For example, you will need to delete "limpet_growth" from all of the functions that have .data as their first argument, as if that is specified in the first line of code, R will assume it is true for all the subsequent lines of code connected by pipes. Here's a hint: when done, your code should look something like this (where you replace ... with the appropriate line of code. Use one function per line; remember that when using pipes, you only need to specify the data frame (limpet_growth) once, in the first row - don't include it in the other rows, or your code won't run:
+
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  ... %>%
+  ... %>%
+  ... %>%
+  ... %>%
+  ... %>%
+  ...
+limpet_growth
+
+Good luck (and don't forget to use the help functions when necessary).
+```{r}
+limpet_growth <- read_csv("limpet_growth.csv") %>%
+  gather(species, growth, 4:7) %>% 
+  filter(temp_trt == "natural") %>% 
+  mutate(log_growth = log(growth)) %>% 
+  slice(1:29, 31:40) %>%
+  group_by(species) %>% 
+  summarize(mean = mean(log_growth), sd = sd(log_growth))
+limpet_growth
+```
+
+You are a coding genius!
+
+That said, trying to cover all the different things you can do with _**dplyr**_ is far beyond the scope of this introductory lesson. This is just the beginning...
+
+### Wrapping up
+Save your file and exit the R session.

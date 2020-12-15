@@ -1,0 +1,238 @@
+---
+title: "Abalone Cove Data Visualization"
+author: "Jhen Cabasal"
+date: "10/19/2020"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Preface
+This is an interactive [R Markdown](http://rmarkdown.rstudio.com) Notebook file.
+
+The first thing you should do is click *File*, and then *Save As* on the menu bar above and rename the file "LastName_AbaloneCove.Rmd"
+
+### Learning objectives
+By the end of this tutorial, you will be able to:
+
+* Visualize data on abundances of sea stars over time in R;
+
+* Propose plausible ecological hypotheses to explain observed patterns in the data;
+
+* Identify the specific data you would need to evaluate those hypotheses (if different from that provided).
+
+### Introduction
+<center>
+![Fig. 1. Ochre sea star at Abalone Cove Shoreline Park, Rancho Palos Verdes, CA.](PVP sea star.png)
+</center>
+
+Intertidal populations of the ochre sea star, *Pisaster ochraceous*, have been monitored annually at three sites on the Palos Verdes Peninsula (PVP) in Southern California for density and individual sizes since 1975. Ochre stars are common on rocky shores from Alaska to Baja and, as the archetypal keystone predator, can have strong effects on local species diversity and community structure via preferential predation on the competitive dominant in the system – the California mussel, *Mytilus californianus*. Here we evaluate the time series of abundances of sea stars on the peninsula and correlate population fluctuations with local and regional climate variables.
+
+### Methods
+We censused each site (Fig. 2) annually starting in 1975, with few exceptions, during a spring tide series from late February to early June. Permanent axes for a grid were established and 30 quadrats (1 m x 1 m) randomly placed within the grid. Each grid was approximately 60 m long (parallel to the shoreline) and 20 m wide, encompassing habitat from the low to upper-middle intertidal zones. Within a quadrat, all *Pisaster ochraceus* were counted and measured in place for greatest diameter.
+
+<center>
+![Fig. 2. Sampling locations on the Palos Verdes Peninsula, Los Angeles County, CA.](PVP sampling locations.png)
+</center>
+
+### Data
+The data we will be working with include the following variables:
+
+Year - sampling year (1975-2016); missing data are marked 'NA'
+Pisaster - sea star abundances summed across all three sites
+Pisaster_recruits - sea star recruitment (abundances of all individuals < 5 cm diameter summed across all three sites)
+Urchins - purple urchin abundances summed across all three sites
+Urchins_recruits - purple urchin recruitment (abundances of all individuals < 1.5 cm diameter summed across all three sites)
+PVP_KELP - local kelp cover in hectares estimated from aerial surveys
+PVP_KELP_prev - local kelp cover in hectares estimated from aerial surveys the previous year
+MEI - multivariate ENSO index
+MEI_prev - multivariate ENSO index the previous year
+PDO - pacific decadal oscillation
+PDO_prev - pacific decadal oscillation the previous year
+PVP_SST - local sea surface temperature
+PVP_SST_prev - local sea surface temperature the previous year
+CUI - coastal upwelling index at 33N latitude
+CUI_prev - coastal upwelling index at 33N latitude the previous year
+CET - cumulative exposure time calculated as total hours of aerial exposure at 1.0 m shore height
+CET_prev - cumulative exposure time calculated as total hours of aerial exposure at 1.0 m shore height the previous year
+NPGO - north pacific gyre oscillation
+NPGO_prev - north pacific gyre oscillation the previous year
+
+### Load packages and import data
+At the beginning of every R file, you should load the specific add-on packages you will need for that analysis.
+
+We will need the _**tidyverse**_ package:
+```{r}
+library(tidyverse)
+```
+
+Import the data, assign it to a data frame called pisaster, and visualize it as a tibble:
+
+pisaster <- read_csv("pisaster.csv")
+pisaster
+```{r}
+pisaster <- read_csv("pisaster.csv")
+pisaster
+```
+
+### Exploratory Data Analysis
+Create plots of sea star abundances over time for both adults and recruits. Compare those patterns to comparable time series of some of the other variables included in the data set. (To add another code chunk below, click 'Insert' on the menu bar at the top of the window and then click 'R'.)
+
+ggplot(pisaster, aes(x = Year, y = Pisaster)) +
+  geom_line(size = 2, color = "blue") +
+  xlab("Year") +
+  ylab("PVP sea star abundance") +
+  theme_bw()
+  
+```{r}
+ggplot(pisaster, aes(x = Year, y = Pisaster)) +
+   geom_line(size = 1.5, color = "blue") +
+   xlab("Year") +
+   ylab("Pisaster abundance") +
+   theme_bw() +
+   labs(title = "PVP Pisaster Sampling (1975-2016)")
+```
+```{r}
+  ggplot(pisaster, aes(x = Year, y = Pisaster_recruits)) +
+  geom_line(size = 1.5, color = "purple") +
+  xlab("Year") +
+  ylab("Pisaster recruit abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+```
+
+```{r}
+ggplot(pisaster, aes(x = Year, y = MEI)) +
+   geom_line(size = 1.5, color = "indianred") +
+   xlab("Year") +
+   ylab("multivariate ENSO index") +
+   theme_bw() +
+   labs(title = "PVP Pisaster Sampling (1975-2016)")
+```
+
+```{r}
+ggplot(pisaster, aes(x = Year, y = PVP_KELP)) +
+   geom_line(size = 1.5, color = "dark green") +
+   xlab("Year") +
+   ylab("Kelp cover (hectares)") +
+   theme_bw() +
+   labs(title = "PVP Pisaster Sampling (1975-2016)")
+```
+
+Now have a look at possible correlations between local environmental indices and abundances of *Pisaster ochraceus* with scatter plots. (To add another code chunk below, click 'Insert' on the menu bar at the top of the window and then click 'R'.)
+
+```{r}
+# Pisaster abundances vs SST
+ggplot(pisaster, aes(x = PVP_SST, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Sea surface temperature (Celsius)") +
+  ylab("PVP sea star abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+# negative relationship between abundance and sea surface temperature
+```
+
+
+```{r}
+# Pisaster abundances vs urchin abundances
+ggplot(pisaster, aes(x = Urchins, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Urchin abundance") +
+  ylab("Pisaster abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+# positive relationship between Pisaster and sea urchin abundances
+```
+
+
+```{r}
+# Pisaster abundances vs kelp cover
+ggplot(pisaster, aes(x = PVP_KELP, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Local kelp cover (hectares)") +
+  ylab("Pisaster abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+# negative relationship between Pisaster and kelp cover (individuals > 5 cm diameter)
+```
+```{r}
+# Pisaster abundances vs various env indices
+
+ggplot(pisaster, aes(x = MEI, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("multivariate ENSO index") +
+  ylab("Pisaster abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+ggplot(pisaster, aes(x = PDO, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Pacific decadal oscillation") +
+  ylab("Pisaster abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+ggplot(pisaster, aes(x = NPGO, y = Pisaster)) +
+  geom_point(size = 1.5, color = " red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("North Pacific gyre oscillation") +
+  ylab("Pisaster abundance") +
+  theme_bw() +
+  labs(title = "PVP Pisaster Sampling (1975-2016)")
+
+# results breakdown:
+# MEI - negative
+# PDO - negative
+# NPGO - positive
+```
+What do you see? Propose at least three plausible ecological hypotheses to explain any observed patterns in the data (e.g., if there is a correlation between sea star abundances and urchin or kelp abundances or a particular climate index, why would that happen?):
+
+```{r}
+ggplot(pisaster, aes(x = MEI, y = Pisaster)) +
+  geom_point(size = 2, color = "red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("multivariate ENSO index") +
+  ylab("PVP sea star abundance") +
+  theme_bw(base_size = 28) +
+  ggsave("pisasterMEI.png", width = 14, height = 6)
+
+ggplot(pisaster, aes(x = PVP_KELP, y = Pisaster)) +
+  geom_point(size = 2, color = "dark green") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Local kelp cover (hectares)") +
+  ylab("PVP sea star abundance") +
+  theme_bw(base_size = 28) +
+  ggsave("pisasterKelp.png", width = 14, height = 6)
+
+ggplot(pisaster, aes(x = PDO, y = Pisaster)) +
+  geom_point(size = 2, color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  xlab("Pacific decadal oscillation") +
+  ylab("PVP sea star abundance") +
+  theme_bw(base_size = 28) +
+  ggsave("pisasterPDO.png", width = 14, height = 6)
+```
+
+
+1. There is a negative correlation between sea star abundances and the MEI, indicating the effects of El Niño events on species distribution. Positive MEI values are representative of El Niño conditions, including: increasing sea surface temperature, decreased upwelling, and decreased bioproduction. These are all factors that could affect where Pisaster is found.
+
+2. There is a negative correlation between sea star abundances and kelp cover. Pisaster abundance decreases with rising sea surface temperatures, which is an indicator of El Niño events and a decline in productivity. Increasing SST would cause a decline in kelp production.
+
+3. There is a negative correlation between sea star abundances and the PDO index. The Pacific Decadal Oscillation is defined by patterns in sea surface temperature. Positive PDO values are indicative of warmer SSTs along the Pacific coast & using the same logic as the previous hypotheses, we would expect the PDO to be a good indicator of Pisaster abundance in our sampling area.
+
+If any of your proposed hypotheses are not testable with the data provided, identify the specific data you would need to have.
+
+**You do NOT need to show all possible plots; just the ones that support your listed hypotheses.**
+
+Nice work!
+
+### Wrapping up
+Save your file and exit the R session.
